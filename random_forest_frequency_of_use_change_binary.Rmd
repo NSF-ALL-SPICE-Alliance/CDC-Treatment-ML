@@ -1,0 +1,212 @@
+---
+title: "Frequency of Use Binary"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(janitor)
+library(haven)
+library(feather)
+library(arrow)
+library(ranger)
+library(vip)
+library(randomForest)
+library(missRanger)
+library(caret)
+library(plotly)
+library(naniar)
+options(scipen = 99)
+set.seed(3328)
+```
+
+
+Read Dataframe
+
+```{r}
+teds_d_select_years_completed_imputed <- read_csv(here("teds_d_select_years_completed_outcomes_aggregated_imputed.csv"))
+```
+
+
+```{r}
+teds_d_select_years_completed_imputed <- teds_d_select_years_completed_imputed %>%
+  mutate_all(as.factor)
+```
+
+
+
+Summarize Imputed Dataframe
+
+```{r}
+glimpse(teds_d_select_years_completed_imputed)
+```
+
+
+Prepare Data for Model
+
+```{r}
+freq_use_rf_data <- teds_d_select_years_completed_imputed %>% 
+  select(-freq1, -freq1_d, -frequency_of_use_change_specific,
+         -employment_change_specific, -living_arrangement_change_specific, -self_help_change_specific) %>% 
+  filter(frequency_of_use_improvement != "unknown")
+
+table(freq_use_rf_data$frequency_of_use_improvement)
+```
+
+
+```{r}
+
+freq_use_rf_data$frequency_of_use_improvement <- as.character(freq_use_rf_data$frequency_of_use_improvement)
+
+freq_use_rf_data_aggregate <- freq_use_rf_data %>%
+  mutate(frequency_of_use_improvement = case_when(
+    frequency_of_use_improvement %in% c("stagnant negative", "regression") ~ "unsuccessful",
+    frequency_of_use_improvement %in% c("stagnant positive", "improvement") ~ "successful",
+    TRUE ~ frequency_of_use_improvement
+  ))
+
+table(freq_use_rf_data_aggregate$frequency_of_use_improvement)
+```
+
+
+```{r}
+freq_use_rf_data_aggregate$frequency_of_use_improvement <- as.factor(freq_use_rf_data_aggregate$frequency_of_use_improvement)
+table(freq_use_rf_data_aggregate$frequency_of_use_improvement)
+```
+
+Run Model
+
+```{r}
+rf_freq_use_aggregate <- ranger(frequency_of_use_improvement ~ ., 
+                  data = freq_use_rf_data_aggregate, 
+                  num.trees = 500,
+                  max.depth = 8,
+                  probability = TRUE,
+              importance = 'impurity',
+              keep.inbag = TRUE,
+              classification = TRUE)
+```
+
+
+```{r}
+rf_freq_use_aggregate
+```
+
+
+Evaluate Model with Confusion Matrix
+
+```{r}
+# Predict class probabilities
+predictions <- as.data.frame(predict(rf_freq_use_aggregate, data = freq_use_rf_data_aggregate, type = "response"))
+
+# Extract predicted class labels
+predicted_labels <- colnames(predictions)[apply(predictions, 1, which.max)]
+
+# Actual class labels
+actual_labels <- freq_use_rf_data_aggregate$frequency_of_use_improvement
+
+# Create a confusion matrix
+confusion_matrix <- confusionMatrix(factor(predicted_labels, levels = levels(actual_labels)),
+                                    factor(actual_labels, levels = levels(actual_labels)))
+
+print(confusion_matrix)
+```
+
+Get Feature Importance
+
+```{r}
+vip(rf_freq_use_aggregate)
+```
+
+```{r}
+vip <- as.data.frame(rf_freq_use_aggregate$variable.importance)
+
+vip <- vip %>% 
+  rownames_to_column("variable")
+
+colnames(vip)[colnames(vip) == "rf_freq_use_aggregate$variable.importance"] ="importance"
+
+vip$importance <- as.numeric(vip$importance)
+
+top_variables <- head(vip[order(-vip$importance), ], 10)
+```
+
+
+```{r}
+top_variables$variable[top_variables$variable == "los"] <- "length of stay"
+top_variables$variable[top_variables$variable == "stfips"] <- "state"
+top_variables$variable[top_variables$variable == "services_d"] <- "service at discharge"
+top_variables$variable[top_variables$variable == "services"] <- "services at admission"
+top_variables$variable[top_variables$variable == "living_arrangement_improvement"] <- "change in living arrangement"
+top_variables$variable[top_variables$variable == "freq_atnd_self_help_d"] <- "attendance at self-help groups"
+top_variables$variable[top_variables$variable == "employment_change_improvement"] <- "change in employment"
+top_variables$variable[top_variables$variable == "psource"] <- "referral source"
+
+
+```
+
+
+```{r}
+
+ggplot(top_variables, aes(x = importance,
+                y = reorder(variable, importance))) +
+  geom_col(fill = "#639CA4FF", color = "black", stat = "identity") +
+  theme_minimal() +
+  labs(title = "Feature Importance",
+       y = "feature",
+       x = "importance (impurity)")
+```
+
+
+
+Run Model for Long Term Rehab
+
+```{r}
+freq_use_rf_data_aggregate_long_term <- freq_use_rf_data_aggregate %>% 
+  filter(services == 5)
+```
+
+```{r}
+table(freq_use_rf_data_aggregate_long_term$frequency_of_use_improvement)
+```
+
+
+```{r}
+rf_freq_use_aggregate_long_term <- ranger(frequency_of_use_improvement ~ ., 
+                  data = freq_use_rf_data_aggregate_long_term, 
+                  num.trees = 500,
+                  max.depth = 8,
+                  probability = TRUE,
+              importance = 'impurity',
+              keep.inbag = TRUE,
+              classification = TRUE)
+```
+
+
+```{r}
+rf_freq_use_aggregate_long_term
+```
+
+```{r}
+# Predict class probabilities
+predictions_long_term <- as.data.frame(predict(rf_freq_use_aggregate_long_term, data = freq_use_rf_data_aggregate_long_term, type = "response"))
+
+# Extract predicted class labels
+predicted_labels_long_term <- colnames(predictions_long_term)[apply(predictions_long_term, 1, which.max)]
+
+# Actual class labels
+actual_labels_long_term <- freq_use_rf_data_aggregate_long_term$frequency_of_use_improvement
+
+# Create a confusion matrix
+confusion_matrix_long_term <- confusionMatrix(factor(predicted_labels_long_term, levels = levels(actual_labels_long_term)),
+                                    factor(actual_labels_long_term, levels = levels(actual_labels_long_term)))
+
+print(confusion_matrix_long_term)
+```
+
+```{r}
+vip(rf_freq_use_aggregate_long_term)
+```
+

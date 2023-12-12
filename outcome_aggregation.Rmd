@@ -1,0 +1,208 @@
+---
+title: "Outcome Aggregation"
+author: "Connor Flynn"
+date: "11/28/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(janitor)
+library(haven)
+library(feather)
+library(arrow)
+options(scipen = 99)
+
+```
+
+Load in Data
+
+```{r}
+teds_d <- arrow::read_feather(here("data/tedsD_2012_2020.feather"))
+```
+
+
+Clean Column Names
+
+```{r}
+teds_d <- teds_d %>% 
+  clean_names()
+```
+
+
+Filter for years with admission/discharge data
+
+
+```{r}
+teds_d_select_years <- teds_d %>% 
+  filter(disyr %in% c("2015", "2016", "2017", "2018", "2019", "2020"))
+```
+
+
+
+
+Replace -9 with NA
+
+```{r}
+teds_d_select_years[teds_d_select_years == "-9"] <- NA
+```
+
+
+
+
+Filter for completed treatment
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years %>% 
+  filter(reason == 1)
+```
+
+
+Holistic Improvements 
+
+Join admission and discharge columns
+
+
+Add Employment Change 
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years_completed %>% 
+  mutate(employment_change_specific = paste(employ, employ_d, sep="-"))
+```
+
+
+```{r}
+teds_d_select_years_completed %>% 
+  select(employ, employ_d, employment_change_specific)
+```
+
+Add Frequency of Use Change
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years_completed %>% 
+  mutate(frequency_of_use_change_specific = paste(freq1, freq1_d, sep="-"))
+```
+
+
+```{r}
+teds_d_select_years_completed %>% 
+  select(freq1, freq1_d, frequency_of_use_change_specific)
+```
+
+
+Add Living Arrangement Change
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years_completed %>% 
+  mutate(living_arrangement_change_specific = paste(livarag, livarag_d, sep="-"))
+```
+
+```{r}
+teds_d_select_years_completed %>% 
+  select(livarag, livarag_d, living_arrangement_change_specific)
+```
+
+
+Add Self Help Change
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years_completed %>% 
+  mutate(self_help_change_specific = paste(freq_atnd_self_help, freq_atnd_self_help_d, sep="-"))
+```
+
+```{r}
+teds_d_select_years_completed %>% 
+  select(freq_atnd_self_help, freq_atnd_self_help_d, self_help_change_specific)
+```
+
+
+Aggregate Outcomes
+
+Frequency of Use Change
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years_completed %>%
+  mutate(frequency_of_use_change_aggregate = case_when(
+    frequency_of_use_change_specific %in% c("3-2", "2-1", "3-1") ~ "improvement",
+    frequency_of_use_change_specific %in% c("3-3", "2-2") ~ "stagnant negative",
+    frequency_of_use_change_specific == "1-1" ~ "stagnant positive",
+    frequency_of_use_change_specific %in% c("1-2", "2-3", "1-3") ~ "regression",
+    TRUE ~ "unknown"
+  ))
+```
+
+```{r}
+table(teds_d_select_years_completed$frequency_of_use_change_aggregate)
+```
+
+
+
+Employment Change
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years_completed %>%
+  mutate(employment_change_aggregate = case_when(
+    employment_change_specific %in% c("4-3", "4-2", "4-1", "3-2", "3-1", "2-1") ~ "improvement",
+    employment_change_specific %in% c("4-4", "3-3") ~ "stagnant negative",
+    employment_change_specific %in% c("1-1", "2-2") ~ "stagnant positive",
+    employment_change_specific %in% c("1-2", "2-3", "3-4", "1-4", "1-3", "2-4") ~ "regression",
+    TRUE ~ "unknown"
+  ))
+```
+
+```{r}
+table(teds_d_select_years_completed$employment_change_aggregate)
+```
+
+Living Arrangements
+
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years_completed %>%
+  mutate(living_arrangement_change_aggregate = case_when(
+    living_arrangement_change_specific %in% c("1-2", "1-3", "2-3") ~ "improvement",
+    living_arrangement_change_specific == "1-1" ~ "stagnant negative",
+    living_arrangement_change_specific == "3-3" ~ "stagnant positive",
+    living_arrangement_change_specific == "2-2" ~ "neutral",
+    living_arrangement_change_specific %in% c("2-1", "3-1", "3-2") ~ "regression",
+    TRUE ~ "unknown"
+  ))
+```
+
+```{r}
+table(teds_d_select_years_completed$living_arrangement_change_aggregate)
+```
+
+Self Help
+
+```{r}
+teds_d_select_years_completed <- teds_d_select_years_completed %>%
+  mutate(self_help_change_aggregate = case_when(
+    self_help_change_specific %in% c("1-2", "2-3", "3-4", "1-5", "1-3", "1-4", "2-4") ~ "improvement",
+    self_help_change_specific == "1-1" ~ "stagnant negative",
+    self_help_change_specific %in% c("2-2", "3-3", "4-4", "5-5") ~ "stagnant positive",
+    self_help_change_specific %in% c("4-3", "3-2", "2-1", "4-1", "4-2", "3-1" ) ~ "regression",
+    TRUE ~ "unknown"
+  ))
+```
+
+```{r}
+teds_d_select_years_completed %>% 
+  select(employ, employ_d, employment_change_specific, employment_change_aggregate,
+         freq1, freq1_d, frequency_of_use_change_specific, frequency_of_use_change_aggregate,
+         freq_atnd_self_help, freq_atnd_self_help_d, self_help_change_specific, self_help_change_aggregate,
+         livarag, livarag_d, living_arrangement_change_specific, living_arrangement_change_aggregate)
+```
+
+
+
+
+Write Dataframe
+
+```{r}
+write_csv(teds_d_select_years_completed, here("data/teds_d_select_years_completed_outcomes_aggregated.csv"))
+
+#teds_d_select_years_completed <- read_csv(here("teds_d_select_years_completed_outcomes_aggregated.csv"))
+```

@@ -1,0 +1,119 @@
+---
+title: "tile map aggreagated changes"
+author: "Connor"
+date: "5/15/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(haven)
+library(janitor)
+library(ranger)
+library(vip)
+library(randomForest)
+#library(plotly)
+#library(randomForestExplainer)
+
+options(scipen = 99)
+```
+
+Load in Data
+
+```{r}
+teds_d_select_years_completed <- read_csv(here("data/teds_d_select_years_completed_outcomes_aggregated.csv"))
+```
+
+
+
+Group by Services and Holistic outcomes
+
+```{r}
+holistic_outcomes_service <- teds_d_select_years_completed %>% 
+  select(services_d, frequency_of_use_change_aggregate, employment_change_aggregate, living_arrangement_change_aggregate, self_help_change_aggregate)
+```
+
+```{r}
+holistic_outcomes_service_longer <- holistic_outcomes_service %>% 
+  pivot_longer(cols = c(frequency_of_use_change_aggregate, employment_change_aggregate, living_arrangement_change_aggregate, self_help_change_aggregate), 
+               names_to = "holistic_variable",
+               values_to = "holistic_outcome")
+```
+
+```{r}
+holistic_outcomes_service_longer_count <- holistic_outcomes_service_longer %>% 
+  group_by(services_d, holistic_variable, holistic_outcome) %>% 
+  count()
+```
+
+```{r}
+holistic_outcomes_service_longer_count <- holistic_outcomes_service_longer_count %>% 
+  group_by(services_d, holistic_variable) %>% 
+  mutate(sum_per_service = sum(n))
+```
+
+```{r}
+holistic_outcomes_service_longer_count <- holistic_outcomes_service_longer_count %>% 
+  mutate(holistic_outcome_ratio = n/sum_per_service)
+```
+
+Services
+
+```{r}
+holistic_outcomes_service_longer_count$services_d <- as.character(holistic_outcomes_service_longer_count$services_d)
+
+holistic_outcomes_service_longer_count["services_d"][holistic_outcomes_service_longer_count["services_d"] == "1"] <- "Detox, 24-hour, hospital inpatient"
+
+holistic_outcomes_service_longer_count["services_d"][holistic_outcomes_service_longer_count["services_d"] == "2"] <- "Detox, 24-hour, free-standing residential"
+
+holistic_outcomes_service_longer_count["services_d"][holistic_outcomes_service_longer_count["services_d"] == "3"] <- "Rehab/residential, hospital (non-detox)"
+
+holistic_outcomes_service_longer_count["services_d"][holistic_outcomes_service_longer_count["services_d"] == "4"] <- "Rehab/residential, short term (30 days or fewer) "
+
+holistic_outcomes_service_longer_count["services_d"][holistic_outcomes_service_longer_count["services_d"] == "5"] <- "Rehab/residential, long term (more than 30 days)"
+
+holistic_outcomes_service_longer_count["services_d"][holistic_outcomes_service_longer_count["services_d"] == "6"] <- "Ambulatory, intensive outpatient"
+
+holistic_outcomes_service_longer_count["services_d"][holistic_outcomes_service_longer_count["services_d"] == "7"] <- "Ambulatory, non-intensive outpatient"
+
+holistic_outcomes_service_longer_count["services_d"][holistic_outcomes_service_longer_count["services_d"] == "8"] <- "Ambulatory, detoxification"
+
+```
+
+```{r}
+holistic_outcomes_service_longer_count$holistic_outcome_ratio <- round(holistic_outcomes_service_longer_count$holistic_outcome_ratio, digit = 2)
+```
+
+
+```{r}
+
+# Define the order for the y-axis
+desired_order <- c("improvement", "stagnant positive", "neutral", "stagnant negative", "regression", "NA")
+
+# Convert the holistic_outcome variable to a factor with the desired order
+holistic_outcomes_service_longer_count$holistic_outcome <- factor(
+  holistic_outcomes_service_longer_count$holistic_outcome,
+  levels = rev(desired_order)
+)
+
+# Plot the data
+ggplot(holistic_outcomes_service_longer_count, aes(
+  x = holistic_variable,
+  y = holistic_outcome,
+  fill = holistic_outcome_ratio
+)) +
+  geom_tile(color = "white", lwd = 1.5, linetype = 1) +
+  theme_minimal() +
+  labs(x = "", y = "", fill = "Percentage Per Outcome (%)") +
+  facet_wrap(~services_d) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 6, hjust = 1),
+    axis.text.y = element_text(size = 8)
+  ) +
+  geom_text(aes(label = holistic_outcome_ratio), color = "white")
+
+  
+```
+

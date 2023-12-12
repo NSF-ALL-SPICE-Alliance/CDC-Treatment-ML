@@ -1,0 +1,1714 @@
+---
+title: "Overview Analysis"
+author: "Connor Flynn"
+date: "7/25/2023"
+output: html_document
+---
+
+Paper Notes
+
+
+Concept Note
+
+*Random forest points us toward facotrs of the system rather than individual attributes*
+
+*Identifying individual attributes in figure 3a*
+
+
+
+Figure 1
+Pyramid Plot
+4 panels
+a-d national
+admission - discharge for 3 other change variables
+
+e,f,g,h same for hawaii
+
+Figure 2
+Chord Diagram
+a-d add employment, living arrangement, self-help
+
+*can we make beginning to end more obvious than arrows*
+
+Figure 3 
+Random Forest Output for all 4 change variables 
+  - drop frequency of use for other 3 change variables 
+Need unreadable (y axis) figure showing all variables important to non-important
+a. all (freq use)
+b. top 10 freq use
+c. employment
+d. living
+e. self help
+90% of the range of importance is encapulated in figure b 
+
+
+Figure 4 
+
+Analysis of 2 highest ranked features by service and length of stay 
+
+Figure 5 
+frequency of use change map a-d (all change variables)
+have unknown as a separate figure 
+
+Figure 6a 
+converts service proportions by state to stacked histogram
+
+b, c, d, chi2 and stacked bars
+
+Figure 7
+Refferal source visualization
+
+
+Hawaii Figures
+8a. Pyramid 
+8b. 
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(chorddiag)
+library(viridis)
+library(patchwork)
+library(hrbrthemes)
+library(circlize)
+library(alluvial)
+library(ggcharts)
+library(naniar)
+library(urbnmapr)
+library(ggiraph)
+library(scales)
+options(scipen = 99)
+```
+
+
+Load in cleaned and outcome aggregated data (from outcome.aggregation.Rmd)
+
+```{r, include=FALSE}
+teds_d_select_years_completed_outcomes_aggregated <- read_csv(here("data/teds_d_select_years_completed_outcomes_aggregated.csv"))
+```
+
+
+Select Relevant Variables for Plotting
+
+```{r}
+relevant_data <- teds_d_select_years_completed_outcomes_aggregated %>% 
+  select(freq1, freq1_d, frequency_of_use_change_specific, frequency_of_use_change_aggregate,
+                              livarag, livarag_d, living_arrangement_change_specific, living_arrangement_change_aggregate,
+                              employ, employ_d, employment_change_specific, employment_change_aggregate,
+                              freq_atnd_self_help, freq_atnd_self_help_d, self_help_change_aggregate, self_help_change_specific, services, services_d, los, stfips)
+```
+
+
+*Pyramid Chart*
+
+Assign numbers meaning for frequency of use
+
+```{r}
+pyramid_data <- relevant_data %>% 
+  select(freq1, freq1_d)
+
+
+pyramid_data <- pyramid_data %>%
+  mutate_at(vars(freq1, freq1_d), as.character)
+
+pyramid_data[is.na(pyramid_data)] <- "unknown"
+
+pyramid_data <- replace(pyramid_data, pyramid_data == 1, "no use")
+
+pyramid_data <- replace(pyramid_data, pyramid_data == 2, "some use")
+
+pyramid_data <- replace(pyramid_data, pyramid_data == 3, "daily use")
+```
+
+```{r}
+pyramid_data_longer <- pyramid_data %>% 
+  pivot_longer(cols = freq1:freq1_d,
+               names_to = "admission_discharge",
+               values_to = "frequency_of_use")
+
+pyramid_data_longer <- pyramid_data_longer %>% 
+  group_by(admission_discharge, frequency_of_use) %>% 
+  count()
+
+pyramid_data_longer <- pyramid_data_longer %>%
+  mutate(admission_discharge = recode(admission_discharge,
+                                      "freq1" = "Admission",
+                                      "freq1_d" = "Discharge"))
+
+pyramid_data_longer <- pyramid_data_longer %>%
+  group_by(admission_discharge) %>%
+  mutate(percent_of_episodes = round(n / sum(n) * 100, 2))
+
+```
+
+Figure 1:
+4 panels
+a-d national
+admission - discharge for 3 other change variables
+
+e,f,g,h same for hawaii
+
+```{r}
+pyramid_chart(pyramid_data_longer, frequency_of_use, n, admission_discharge, bar_colors = c("#D2AD7CFF","#639CA4FF"), xlab = "Number of Treatment Episodes") 
+
+# add percentage in powerpoint
+
+```
+
+Employment
+
+Assign numbers meaning for frequency of use
+
+```{r}
+pyramid_data_employment <- relevant_data %>% 
+  select(employ, employ_d)
+
+
+pyramid_data_employment <- pyramid_data_employment %>%
+  mutate_at(vars(employ, employ_d), as.character)
+
+pyramid_data_employment[is.na(pyramid_data_employment)] <- "unknown"
+
+pyramid_data_employment <- replace(pyramid_data_employment, pyramid_data_employment == 1, "full-time")
+
+pyramid_data_employment <- replace(pyramid_data_employment, pyramid_data_employment == 2, "part-time")
+
+pyramid_data_employment <- replace(pyramid_data_employment, pyramid_data_employment == 3, "unemployed")
+
+pyramid_data_employment <- replace(pyramid_data_employment, pyramid_data_employment == 4, "not in labor force")
+```
+
+```{r}
+pyramid_data_employment_longer <- pyramid_data_employment %>% 
+  pivot_longer(cols = employ:employ_d,
+               names_to = "admission_discharge",
+               values_to = "employment")
+
+pyramid_data_employment_longer <- pyramid_data_employment_longer %>% 
+  group_by(admission_discharge, employment) %>% 
+  count()
+
+pyramid_data_employment_longer <- pyramid_data_employment_longer %>%
+  mutate(admission_discharge = recode(admission_discharge,
+                                      "employ" = "Admission",
+                                      "employ_d" = "Discharge"))
+
+pyramid_data_employment_longer <- pyramid_data_employment_longer %>%
+  group_by(admission_discharge) %>%
+  mutate(percent_of_episodes = round(n / sum(n) * 100, 2))
+```
+
+
+```{r}
+pyramid_chart(pyramid_data_employment_longer, employment, n, admission_discharge, bar_colors = c("#D2AD7CFF","#639CA4FF"), xlab = "Number of Treatment Episodes") 
+
+
+```
+
+Living Arrangement
+
+```{r}
+pyramid_data_living_arrangement <- relevant_data %>% 
+  select(livarag, livarag_d)
+
+
+pyramid_data_living_arrangement <- pyramid_data_living_arrangement %>%
+  mutate_at(vars(livarag, livarag_d), as.character)
+
+pyramid_data_living_arrangement[is.na(pyramid_data_living_arrangement)] <- "unknown"
+
+pyramid_data_living_arrangement <- replace(pyramid_data_living_arrangement, pyramid_data_living_arrangement == 1, "homeless")
+
+pyramid_data_living_arrangement <- replace(pyramid_data_living_arrangement, pyramid_data_living_arrangement == 2, "dependent living")
+
+pyramid_data_living_arrangement <- replace(pyramid_data_living_arrangement, pyramid_data_living_arrangement == 3, "independent living")
+```
+
+```{r}
+pyramid_data_living_arrangement_longer <- pyramid_data_living_arrangement %>% 
+  pivot_longer(cols = livarag:livarag_d,
+               names_to = "admission_discharge",
+               values_to = "living_arrangement")
+
+pyramid_data_living_arrangement_longer <- pyramid_data_living_arrangement_longer %>% 
+  group_by(admission_discharge, living_arrangement) %>% 
+  count()
+
+pyramid_data_living_arrangement_longer <- pyramid_data_living_arrangement_longer %>%
+  mutate(admission_discharge = recode(admission_discharge,
+                                      "livarag" = "Admission",
+                                      "livarag_d" = "Discharge"))
+
+pyramid_data_living_arrangement_longer <- pyramid_data_living_arrangement_longer %>%
+  group_by(admission_discharge) %>%
+  mutate(percent_of_episodes = round(n / sum(n) * 100, 2))
+```
+
+
+```{r}
+pyramid_chart(pyramid_data_living_arrangement_longer, living_arrangement, n, admission_discharge, bar_colors = c("#D2AD7CFF","#639CA4FF"), xlab = "Number of Treatment Episodes") 
+
+
+```
+
+
+Self help
+
+```{r}
+pyramid_data_self_help <- relevant_data %>% 
+  select(freq_atnd_self_help, freq_atnd_self_help_d)
+
+
+pyramid_data_self_help <- pyramid_data_self_help %>%
+  mutate_at(vars(freq_atnd_self_help, freq_atnd_self_help_d), as.character)
+
+pyramid_data_self_help[is.na(pyramid_data_self_help)] <- "unknown"
+
+pyramid_data_self_help <- replace(pyramid_data_self_help, pyramid_data_self_help == 1, "No attendance")
+
+pyramid_data_self_help <- replace(pyramid_data_self_help, pyramid_data_self_help == 2, "1-3 times in the past month")
+
+pyramid_data_self_help <- replace(pyramid_data_self_help, pyramid_data_self_help == 3, "4-7 times in the past month ")
+
+pyramid_data_self_help <- replace(pyramid_data_self_help, pyramid_data_self_help == 4, "8-30 times in the past month ")
+
+pyramid_data_self_help <- replace(pyramid_data_self_help, pyramid_data_self_help == 5, "Some attendance, frequency is unknown ")
+
+
+```
+
+```{r}
+pyramid_data_self_help_longer <- pyramid_data_self_help %>% 
+  pivot_longer(cols = freq_atnd_self_help:freq_atnd_self_help_d,
+               names_to = "admission_discharge",
+               values_to = "self_help")
+
+pyramid_data_self_help_longer <- pyramid_data_self_help_longer %>% 
+  group_by(admission_discharge, self_help) %>% 
+  count()
+
+pyramid_data_self_help_longer <- pyramid_data_self_help_longer %>%
+  mutate(admission_discharge = recode(admission_discharge,
+                                      "freq_atnd_self_help" = "Admission",
+                                      "freq_atnd_self_help_d" = "Discharge"))
+
+pyramid_data_self_help_longer <- pyramid_data_self_help_longer %>%
+  group_by(admission_discharge) %>%
+  mutate(percent_of_episodes = round(n / sum(n) * 100, 2))
+```
+
+
+```{r}
+pyramid_chart(pyramid_data_self_help_longer, self_help, n, admission_discharge, bar_colors = c("#D2AD7CFF","#639CA4FF"), xlab = "Number of Treatment Episodes") 
+```
+
+
+
+
+
+*Chord Diagram*
+
+Frequency of Use
+
+```{r}
+frequency_of_use_paths <- pyramid_data %>% 
+  group_by(freq1, freq1_d) %>% 
+  count()
+```
+
+
+```{r}
+frequency_of_use_paths <- frequency_of_use_paths %>%
+  rename(rowname = freq1)
+
+frequency_of_use_paths <- frequency_of_use_paths %>%
+  rename(key = freq1_d)
+
+frequency_of_use_paths <- frequency_of_use_paths %>%
+  rename(value = n)
+```
+
+
+
+```{r}
+matrix_data <- frequency_of_use_paths %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data <- column_to_rownames(matrix_data, var = "rowname")
+
+matrix_data <- as.matrix(matrix_data)
+```
+
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(16, "Geyser")
+colors <- c(`no use` = "#D2AD7CFF", `some use` = "#639CA4FF",
+            `daily use` = "#226060FF", `unknown` = "#BE7245FF")
+
+chordDiagram(matrix_data,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+
+
+
+
+```
+
+Daily users are slightly overrepresented in the unknown category at discharge
+
+
+If we want, chord by services that can be found in CDC-Substance-Use-ML.Rproj in the sankey.Rmd
+
+
+
+
+Employment:
+
+```{r}
+paths_employment <- pyramid_data_employment %>% 
+  group_by(employ, employ_d) %>% 
+  count()
+```
+
+
+```{r}
+paths_employment <- paths_employment %>%
+  rename(rowname = employ)
+
+paths_employment <- paths_employment %>%
+  rename(key = employ_d)
+
+paths_employment <- paths_employment %>%
+  rename(value = n)
+```
+
+
+
+```{r}
+matrix_data_employment <- paths_employment %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_employment <- column_to_rownames(matrix_data_employment, var = "rowname")
+
+matrix_data_employment <- as.matrix(matrix_data_employment)
+```
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(25, "Geyser")
+colors <- c(`full-time` = "#D2AD7CFF", `not in labor force` = "#639CA4FF",
+            `part-time` = "#226060FF", `unknown` = "#BE7245FF", `unemployed` = "#CE6B33")
+
+chordDiagram(matrix_data_employment,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+
+
+```
+
+
+Living Arrangement
+
+```{r}
+paths_living_arrangement <- pyramid_data_living_arrangement %>% 
+  group_by(livarag, livarag_d) %>% 
+  count()
+```
+
+
+```{r}
+paths_living_arrangement <- paths_living_arrangement %>%
+  rename(rowname = livarag)
+
+paths_living_arrangement <- paths_living_arrangement %>%
+  rename(key = livarag_d)
+
+paths_living_arrangement <- paths_living_arrangement %>%
+  rename(value = n)
+```
+
+
+
+```{r}
+matrix_data_living_arrangement <- paths_living_arrangement %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_living_arrangement <- column_to_rownames(matrix_data_living_arrangement, var = "rowname")
+
+matrix_data_living_arrangement <- as.matrix(matrix_data_living_arrangement)
+```
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(16, "Geyser")
+colors <- c(`dependent living` = "#D2AD7CFF", `homeless` = "#639CA4FF",
+            `independent living` = "#226060FF", `unknown` = "#BE7245FF")
+
+chordDiagram(matrix_data_living_arrangement,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+
+
+```
+
+
+Self Help
+
+```{r}
+paths_self_help <- pyramid_data_self_help %>% 
+  group_by(freq_atnd_self_help, freq_atnd_self_help_d) %>% 
+  count()
+```
+
+
+```{r}
+paths_self_help <- paths_self_help %>%
+  rename(rowname = freq_atnd_self_help)
+
+paths_self_help <- paths_self_help %>%
+  rename(key = freq_atnd_self_help_d)
+
+paths_self_help <- paths_self_help %>%
+  rename(value = n)
+```
+
+
+
+```{r}
+matrix_data_self_help <- paths_self_help %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_self_help <- column_to_rownames(matrix_data_self_help, var = "rowname")
+
+matrix_data_self_help <- as.matrix(matrix_data_self_help)
+```
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(36, "Geyser")
+colors <- c(`No attendance` = "#D2AD7CFF", `1-3 times in the past month` = "#639CA4FF",
+            `4-7 times in the past month ` = "#226060FF", `8-30 times in the past month ` = "#BE7245FF",`Some attendance, frequency is unknown` = "#F3E3B2", `Some attendance, frequency is unknown` = "#D78F4E")
+
+chordDiagram(matrix_data_self_help,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors,
+    scale = TRUE) 
+
+
+```
+
+
+
+*Length of Stay | Services | Frequency of Use Change Aggregate*
+
+Assign Services numbers meaning
+
+```{r}
+relevant_data$services_d <- as.character(relevant_data$services_d)
+
+relevant_data["services_d"][relevant_data["services_d"] == "1"] <- "Detox, 24-hour, hospital inpatient"
+
+relevant_data["services_d"][relevant_data["services_d"] == "2"] <- "Detox, 24-hour, free-standing residential"
+
+relevant_data["services_d"][relevant_data["services_d"] == "3"] <- "Rehab/residential, hospital (non-detox)"
+
+relevant_data["services_d"][relevant_data["services_d"] == "4"] <- "Rehab/residential, short term (30 days or fewer) "
+
+relevant_data["services_d"][relevant_data["services_d"] == "5"] <- "Rehab/residential, long term (more than 30 days)"
+
+relevant_data["services_d"][relevant_data["services_d"] == "6"] <- "Ambulatory, intensive outpatient"
+
+relevant_data["services_d"][relevant_data["services_d"] == "7"] <- "Ambulatory, non-intensive outpatient"
+
+relevant_data["services_d"][relevant_data["services_d"] == "8"] <- "Ambulatory, detoxification"
+  
+```
+
+
+
+```{r}
+ggplot(relevant_data, aes(x = los, fill = frequency_of_use_change_aggregate)) +
+  geom_bar(stat = "count") +
+  facet_wrap(~services_d, scales = "free_y") +
+  theme_minimal() +
+  #scale_fill_brewer(palette = "Set3") +
+  labs(title = "Frequency of Use Change and Length of Stay by Service",
+       subtitle = "TEDS-D Completed Treatments 2015-2020",
+       x = "Length of Stay in Days (Aggregated after 30 days)",
+       y = "Number of Treatment Episodes",
+       fill = "Frequency of Use Change Aggregate") +
+  scale_fill_manual(breaks=c("improvement","stagnant positive","stagnant negative", "regression", "unknown"),
+                      values = c("darkseagreen", "cadetblue", "coral3", "darkorange2", "antiquewhite4"))
+```
+
+
+
+*Mapping*
+
+
+```{r, include=FALSE}
+data = urbnmapr::states
+```
+
+
+```{r, include=FALSE}
+relevant_data$stfips <- sprintf('%02d', relevant_data$stfips)
+```
+
+
+```{r, include=FALSE}
+colnames(relevant_data)[colnames(relevant_data) == "stfips"] <- "state_fips"
+```
+
+
+
+```{r, include=FALSE}
+relevant_data_freq_use_state <- relevant_data %>% 
+  group_by(state_fips, frequency_of_use_change_aggregate) %>% 
+  count()
+```
+
+
+```{r, include=FALSE}
+relevant_data_freq_use_state <- relevant_data_freq_use_state %>% 
+  pivot_wider(names_from = frequency_of_use_change_aggregate,
+              values_from = n)
+```
+
+
+```{r, include=FALSE}
+relevant_data_freq_use_state <- relevant_data_freq_use_state %>% 
+  mutate(Sum = sum(improvement, regression, `stagnant negative`, `stagnant positive`, unknown))
+```
+
+
+
+```{r, include=FALSE}
+relevant_data_freq_use_state <- relevant_data_freq_use_state %>% 
+  mutate(ratio_improved = improvement/Sum)
+```
+
+```{r, include=FALSE}
+relevant_data_freq_use_state <- relevant_data_freq_use_state %>% 
+  mutate(ratio_regressed = regression/Sum)
+```
+
+```{r, include=FALSE}
+relevant_data_freq_use_state <- relevant_data_freq_use_state %>% 
+  mutate(ratio_stagnant_negative = `stagnant negative`/Sum)
+```
+
+```{r, include=FALSE}
+relevant_data_freq_use_state <- relevant_data_freq_use_state %>% 
+  mutate(ratio_stagnant_positive = `stagnant positive`/Sum)
+```
+
+```{r, include=FALSE}
+relevant_data_freq_use_state <- relevant_data_freq_use_state %>% 
+  mutate(ratio_unknown = unknown/Sum)
+```
+
+```{r, include=FALSE}
+# teds_d_freq_use <- teds_d_freq_use %>% 
+#   mutate(ratio_improved_stagnant_postive = (improvement + `stagnant positive`)/Sum)
+```
+
+
+
+```{r, include=FALSE}
+relevant_data_freq_use_state_spatial <- left_join(get_urbn_map(map = "states", sf = TRUE),
+                          relevant_data_freq_use_state,
+                          by = "state_fips")
+```
+
+```{r, include=FALSE}
+relevant_data_freq_use_state_spatial_long <- relevant_data_freq_use_state_spatial %>% 
+  pivot_longer(cols = c(ratio_improved,ratio_stagnant_positive, ratio_stagnant_negative, ratio_regressed, ratio_unknown), 
+               values_to = "ratios",
+               names_to = "freq_use_change")
+```
+
+```{r, include=FALSE}
+relevant_data_freq_use_state_spatial_long <- relevant_data_freq_use_state_spatial_long %>%
+  mutate(
+    tooltip_text = paste0(toupper(state_name), "\n", 
+                   ratios))
+```
+
+```{r}
+relevant_data_freq_use_state_spatial_long$freq_use_change[relevant_data_freq_use_state_spatial_long$freq_use_change == 'ratio_regressed'] <- 'Regression'
+relevant_data_freq_use_state_spatial_long$freq_use_change[relevant_data_freq_use_state_spatial_long$freq_use_change == 'ratio_improved'] <- 'Improvement'
+relevant_data_freq_use_state_spatial_long$freq_use_change[relevant_data_freq_use_state_spatial_long$freq_use_change == 'ratio_stagnant_positive'] <- 'Stagnant Positive'
+relevant_data_freq_use_state_spatial_long$freq_use_change[relevant_data_freq_use_state_spatial_long$freq_use_change == 'ratio_stagnant_negative'] <- 'Stagnant Negative'
+relevant_data_freq_use_state_spatial_long$freq_use_change[relevant_data_freq_use_state_spatial_long$freq_use_change == 'ratio_unknown'] <- 'Unknown'
+relevant_data_freq_use_state_spatial_long$freq_use_change[relevant_data_freq_use_state_spatial_long$freq_use_change == 'ratio_improved_stagnant_postive'] <- 'Improvement or Stagnant Positive'
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+freq_use_state_spatial_long_map_faceted <- ggplot(relevant_data_freq_use_state_spatial_long) +
+  geom_sf_interactive(relevant_data_freq_use_state_spatial_long,
+          mapping = aes(fill = ratios, tooltip = tooltip_text, data_id = state_name),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes") +
+   coord_sf(datum = NA)+
+  #geom_sf_text(data = get_urbn_labels(map = "territories_states", sf = TRUE), 
+                #aes(label = state_abbv), 
+            #size = 3) +
+   theme_minimal() +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        legend.text = element_text(size = 4),  # Adjust the legend text size
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4)) +  # Adjust the legend title size) +
+  facet_wrap(~freq_use_change, ncol = 3, nrow = 2)
+
+#girafe(ggobj = freq_use_state_spatial_long_map_faceted)
+```
+
+
+```{r}
+ggplot(relevant_data_freq_use_state_spatial_long) +
+  geom_sf(relevant_data_freq_use_state_spatial_long,
+          mapping = aes(fill = ratios),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes") +
+   coord_sf(datum = NA)+
+  #geom_sf_text(data = get_urbn_labels(map = "territories_states", sf = TRUE), 
+                #aes(label = state_abbv), 
+            #size = 3) +
+   theme_minimal() +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        legend.text = element_text(size = 4),  # Adjust the legend text size
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4)) +  # Adjust the legend title size) +
+  facet_wrap(~freq_use_change, ncol = 3, nrow = 2)
+
+
+```
+
+
+
+```{r}
+breaks <- seq(0, 1, by = 0.1)
+labels <- c("0-10%", "11-20%", "21-30%", "31-40%", "41-50%", "51-60%", "61-70%", "71-80%", "81-90%", "91-100%")
+
+ggplot(relevant_data_freq_use_state_spatial_long) +
+  geom_sf(mapping = aes(fill = cut(ratios, breaks = breaks, labels = labels, include.lowest = TRUE)),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes") +
+  scale_fill_viridis_d(option = "D") +  # Assign specific colors to each bin
+  coord_sf(datum = NA) +
+  theme_minimal() +
+  theme(
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    legend.text = element_text(size = 4),  # Adjust the legend text size
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4)  # Adjust the legend title size
+  ) +
+  facet_wrap(~freq_use_change, ncol = 3, nrow = 2)
+
+```
+
+```{r}
+
+```
+
+
+
+Treatment Episodes by Service by State
+
+
+```{r}
+relevant_data_services_by_state <- relevant_data %>% 
+  group_by(state_fips, services_d) %>% 
+  count()
+```
+
+
+```{r}
+relevant_data_services_by_state <- relevant_data_services_by_state %>%
+  group_by(state_fips, services_d) %>%
+  summarise(percentage = sum(n) / sum(relevant_data_services_by_state$n))
+
+# Normalize the percentages to ensure each state_fips sums to 1
+relevant_data_services_by_state <- relevant_data_services_by_state %>%
+  group_by(state_fips) %>%
+  mutate(percentage = percentage / sum(percentage))
+```
+
+```{r}
+relevant_data_services_by_state_spatial <- left_join(get_urbn_map(map = "states", sf = TRUE),
+                          relevant_data_services_by_state,
+                          by = "state_fips")
+```
+
+
+```{r}
+breaks <- seq(0, 1, by = 0.1)
+labels <- c("0-10%", "11-20%", "21-30%", "31-40%", "41-50%", "51-60%", "61-70%", "71-80%", "81-90%", "91-100%")
+
+ggplot(relevant_data_services_by_state_spatial) +
+  geom_sf(mapping = aes(fill = cut(percentage, breaks = breaks, labels = labels, include.lowest = TRUE)),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes") +
+  scale_fill_viridis_d(option = "D") +  # Assign specific colors to each bin
+  coord_sf(datum = NA) +
+  theme_minimal() +
+  theme(
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    legend.text = element_text(size = 4),  # Adjust the legend text size
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4)  # Adjust the legend title size
+  ) +
+  facet_wrap(~services_d, ncol = 3, nrow = 3)
+
+```
+
+
+
+Median LOS by State
+
+
+```{r}
+los_by_state <- left_join(get_urbn_map(map = "states", sf = TRUE),
+                          relevant_data,
+                          by = "state_fips")
+```
+
+```{r}
+los_by_state <- los_by_state %>% 
+  group_by(state_name) %>% 
+  mutate(median = median(los, na.rm = TRUE))
+```
+
+
+```{r}
+ggplot(los_by_state, aes(x = los, y = reorder(state_name, median), fill = median)) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_minimal() +
+  scale_fill_viridis_c() +
+  theme(text = element_text(size=5),
+        legend.position = "none") +
+  labs(title = "Length of Stay by State",
+       x = "Lenght of Stay (Days)",
+       y = "State")
+```
+
+
+
+```{r}
+ggplot(relevant_data, aes(x = los, fill = services_d)) +
+  geom_histogram(color = "black") +
+  scale_fill_viridis_d() +
+  theme_minimal() 
+```
+```{r}
+relevant_data %>% 
+  group_by(services, services_d) %>% 
+  count()
+```
+
+```{r}
+ggplot(relevant_data, aes(y = services_d)) +
+  geom_bar(stat="count")
+```
+
+
+
+*Done for 11/28*
+
+
+
+
+```{r}
+# Create the missingness plot
+plot <- gg_miss_var(teds_d_select_years_completed_improvements)
+
+# Modify the y-axis text size using ggplot2 theme options
+plot + theme(axis.text.y = element_text(size = 5))
+```
+
+
+
+```{r}
+relevant_chord_data <- teds_d_select_years_completed_improvements_imputed %>% 
+  select(freq1, freq1_d, frequency_of_use_change_specific, frequency_of_use_improvement,
+                              livarag, livarag_d, living_arrangement_change_specific, living_arrangement_improvement,
+                              employ, employ_d, employment_change_specific, employment_change_improvement,
+                              freq_atnd_self_help, freq_atnd_self_help_d, self_help_change_specific, self_help_improvement, services)
+```
+
+```{r}
+frequency_of_use_paths <- relevant_chord_data %>% 
+  group_by(freq1, freq1_d) %>% 
+  count()
+```
+
+```{r}
+frequency_of_use_paths <- frequency_of_use_paths %>%
+  mutate_at(vars(freq1, freq1_d), as.character)
+```
+
+```{r}
+frequency_of_use_paths[is.na(frequency_of_use_paths)] <- "unknown"
+
+frequency_of_use_paths <- replace(frequency_of_use_paths, frequency_of_use_paths == 1, "no use")
+
+frequency_of_use_paths <- replace(frequency_of_use_paths, frequency_of_use_paths == 2, "some use")
+
+frequency_of_use_paths <- replace(frequency_of_use_paths, frequency_of_use_paths == 3, "daily use")
+
+```
+
+```{r}
+frequency_of_use_paths <- frequency_of_use_paths %>%
+  rename(rowname = freq1)
+
+frequency_of_use_paths <- frequency_of_use_paths %>%
+  rename(key = freq1_d)
+
+frequency_of_use_paths <- frequency_of_use_paths %>%
+  rename(value = n)
+```
+
+
+```{r}
+frequency_of_use_paths
+```
+
+
+
+
+
+
+```{r}
+matrix_data <- frequency_of_use_paths %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data <- column_to_rownames(matrix_data, var = "rowname")
+
+matrix_data <- as.matrix(matrix_data)
+```
+
+
+
+
+
+
+Final Chord
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(16, "Geyser")
+colors <- c(`no use` = "#D2AD7CFF", `some use` = "#639CA4FF",
+            `daily use` = "#226060FF", `unknown` = "#BE7245FF")
+
+chordDiagram(matrix_data,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors,
+    scale = TRUE) 
+
+
+
+
+```
+
+```{r}
+frequency_of_use_supplemental <- relevant_chord_data %>% 
+  select(freq1, freq1_d)
+
+frequency_of_use_supplemental <- frequency_of_use_supplemental %>%
+  mutate_at(vars(freq1, freq1_d), as.character)
+
+frequency_of_use_supplemental[is.na(frequency_of_use_supplemental)] <- "unknown"
+
+frequency_of_use_supplemental <- replace(frequency_of_use_supplemental, frequency_of_use_supplemental == 1, "no use")
+
+frequency_of_use_supplemental <- replace(frequency_of_use_supplemental, frequency_of_use_supplemental == 2, "some use")
+
+frequency_of_use_supplemental <- replace(frequency_of_use_supplemental, frequency_of_use_supplemental == 3, "daily use")
+```
+
+
+```{r}
+frequency_of_use_supplemental_freq1_count <- frequency_of_use_supplemental %>% 
+  group_by(freq1) %>% 
+  count()
+
+```
+
+```{r}
+ggplot(frequency_of_use_supplemental_freq1_count, aes(y = reorder(freq1,n), x = n)) +
+  geom_col(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Frequency of Use at Admission",
+       subtitle = "TEDS-D Completed Treatments 2015-2020",
+       x = "Number of Treatment Episodes",
+       y = "Frequency of Use")
+```
+```{r}
+frequency_of_use_supplemental_freq1_d_count <- frequency_of_use_supplemental %>% 
+  group_by(freq1_d) %>% 
+  count()
+
+```
+
+```{r}
+ggplot(frequency_of_use_supplemental_freq1_d_count, aes(y = reorder(freq1_d,n), x = n)) +
+  geom_col(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Frequency of Use at Discharge",
+       subtitle = "TEDS-D Completed Treatments 2015-2020",
+       x = "Number of Treatment Episodes",
+       y = "Frequency of Use")
+```
+
+```{r}
+frequency_of_use_supplemental_longer <- frequency_of_use_supplemental %>% 
+  pivot_longer(cols = freq1:freq1_d,
+               names_to = "admission_discharge",
+               values_to = "frequency_of_use")
+
+frequency_of_use_supplemental_longer <- frequency_of_use_supplemental_longer %>% 
+  group_by(admission_discharge, frequency_of_use) %>% 
+  count()
+
+frequency_of_use_supplemental_longer <- frequency_of_use_supplemental_longer %>%
+  mutate(admission_discharge = recode(admission_discharge,
+                                      "freq1" = "Admission",
+                                      "freq1_d" = "Discharge"))
+
+```
+
+
+
+```{r}
+pyramid_chart(frequency_of_use_supplemental_longer, frequency_of_use, n, admission_discharge, bar_colors = c("#D2AD7CFF","#639CA4FF"), xlab = "Number of Treatment Episodes") 
+```
+
+
+
+Chord No Unknown
+
+
+```{r}
+frequency_of_use_paths_no_unknown <- frequency_of_use_paths %>% 
+  filter(rowname!= "unknown" & key != "unknown")
+```
+
+
+```{r}
+matrix_data_no_unknown <- frequency_of_use_paths_no_unknown %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_no_unknown <- column_to_rownames(matrix_data_no_unknown, var = "rowname")
+
+matrix_data_no_unknown <- as.matrix(matrix_data_no_unknown)
+```
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(9, "Geyser")
+colors <- c(`no use` = "#D2AD7CFF", `some use` = "#639CA4FF",
+            `daily use` = "#226060FF")
+
+chordDiagram(matrix_data_no_unknown,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+
+
+
+
+```
+
+
+
+Chord Employment
+
+```{r}
+frequency_of_use_paths_employment <- relevant_chord_data %>% 
+  group_by(employ, employ_d) %>% 
+  count()
+```
+
+```{r}
+frequency_of_use_paths_employment <- frequency_of_use_paths_employment %>%
+  mutate_at(vars(employ, employ_d), as.character)
+```
+
+```{r}
+frequency_of_use_paths_employment[is.na(frequency_of_use_paths_employment)] <- "unknown"
+
+frequency_of_use_paths_employment <- replace(frequency_of_use_paths_employment, frequency_of_use_paths_employment == 1, "full time")
+
+frequency_of_use_paths_employment <- replace(frequency_of_use_paths_employment, frequency_of_use_paths_employment == 2, "part time")
+
+frequency_of_use_paths_employment <- replace(frequency_of_use_paths_employment, frequency_of_use_paths_employment == 3, "unemployed")
+
+frequency_of_use_paths_employment <- replace(frequency_of_use_paths_employment, frequency_of_use_paths_employment == 4, "not in labor force")
+
+```
+
+```{r}
+frequency_of_use_paths_employment <- frequency_of_use_paths_employment %>%
+  rename(rowname = employ)
+
+frequency_of_use_paths_employment <- frequency_of_use_paths_employment %>%
+  rename(key = employ_d)
+
+frequency_of_use_paths_employment <- frequency_of_use_paths_employment %>%
+  rename(value = n)
+```
+
+
+```{r}
+frequency_of_use_paths_employment <- frequency_of_use_paths_employment %>% 
+  filter(rowname!= "unknown" & key != "unknown")
+```
+
+
+
+
+```{r}
+matrix_data_employment <- frequency_of_use_paths_employment %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_employment <- column_to_rownames(matrix_data_employment, var = "rowname")
+
+matrix_data_employment <- as.matrix(matrix_data_employment)
+```
+
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(16, "Geyser")
+colors <- c(`full time` = "#D2AD7CFF", `part time` = "#639CA4FF",
+            `unemployed` = "#226060FF", `not in labor force` = "#BE7245FF")
+
+chordDiagram(matrix_data_employment,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+
+
+
+
+```
+
+
+
+
+Chord Housing
+
+```{r}
+frequency_of_use_paths_housing <- relevant_chord_data %>% 
+  group_by(livarag, livarag_d) %>% 
+  count()
+```
+
+```{r}
+frequency_of_use_paths_housing <- frequency_of_use_paths_housing %>%
+  mutate_at(vars(livarag, livarag_d), as.character)
+```
+
+```{r}
+frequency_of_use_paths_housing[is.na(frequency_of_use_paths_housing)] <- "unknown"
+
+frequency_of_use_paths_housing <- replace(frequency_of_use_paths_housing, frequency_of_use_paths_housing == 1, "homeless")
+
+frequency_of_use_paths_housing <- replace(frequency_of_use_paths_housing, frequency_of_use_paths_housing == 2, "dependent living")
+
+frequency_of_use_paths_housing <- replace(frequency_of_use_paths_housing, frequency_of_use_paths_housing == 3, "independent living")
+
+
+```
+
+```{r}
+frequency_of_use_paths_housing <- frequency_of_use_paths_housing %>%
+  rename(rowname = livarag)
+
+frequency_of_use_paths_housing <- frequency_of_use_paths_housing %>%
+  rename(key = livarag_d)
+
+frequency_of_use_paths_housing <- frequency_of_use_paths_housing %>%
+  rename(value = n)
+```
+
+
+```{r}
+frequency_of_use_paths_housing <- frequency_of_use_paths_housing %>% 
+  filter(rowname!= "unknown" & key != "unknown")
+```
+
+
+
+
+```{r}
+matrix_data_housing <- frequency_of_use_paths_housing %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_housing <- column_to_rownames(matrix_data_housing, var = "rowname")
+
+matrix_data_housing <- as.matrix(matrix_data_housing)
+```
+
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(9, "Geyser")
+colors <- c(`homeless` = "#D2AD7CFF", `dependent living` = "#639CA4FF",
+            `independent living` = "#226060FF")
+
+chordDiagram(matrix_data_housing,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+
+
+
+
+```
+
+
+Try Grouped Frequency of Use Change
+
+```{r}
+frequency_of_use_paths_services<- relevant_chord_data %>% 
+  group_by(freq1, freq1_d, services) %>% 
+  count()
+```
+
+```{r}
+frequency_of_use_paths_services <- frequency_of_use_paths_services %>%
+  mutate_at(vars(freq1, freq1_d, services), as.character)
+```
+
+```{r}
+
+frequency_of_use_paths_services["services"][frequency_of_use_paths_services["services"] == "1"] <- "Detox, 24-hour, hospital inpatient"
+
+frequency_of_use_paths_services["services"][frequency_of_use_paths_services["services"] == "2"] <- "Detox, 24-hour, free-standing residential"
+
+frequency_of_use_paths_services["services"][frequency_of_use_paths_services["services"] == "3"] <- "Rehab/residential, hospital (non-detox)"
+
+frequency_of_use_paths_services["services"][frequency_of_use_paths_services["services"] == "4"] <- "Rehab/residential, short term (30 days or fewer)"
+
+frequency_of_use_paths_services["services"][frequency_of_use_paths_services["services"] == "5"] <- "Rehab/residential, long term (more than 30 days)"
+
+frequency_of_use_paths_services["services"][frequency_of_use_paths_services["services"] == "6"] <- "Ambulatory, intensive outpatient"
+
+frequency_of_use_paths_services["services"][frequency_of_use_paths_services["services"] == "7"] <- "Ambulatory, non-intensive outpatient"
+
+frequency_of_use_paths_services["services"][frequency_of_use_paths_services["services"] == "8"] <- "Ambulatory, detoxification"
+
+
+
+
+frequency_of_use_paths_services[is.na(frequency_of_use_paths_services)] <- "unknown"
+
+frequency_of_use_paths_services <- replace(frequency_of_use_paths_services, frequency_of_use_paths_services == 1, "no use")
+
+frequency_of_use_paths_services <- replace(frequency_of_use_paths_services, frequency_of_use_paths_services == 2, "some use")
+
+frequency_of_use_paths_services <- replace(frequency_of_use_paths_services, frequency_of_use_paths_services == 3, "daily use")
+
+
+
+
+```
+
+```{r}
+frequency_of_use_paths_services <- frequency_of_use_paths_services %>%
+  rename(rowname = freq1)
+
+frequency_of_use_paths_services <- frequency_of_use_paths_services %>%
+  rename(key = freq1_d)
+
+frequency_of_use_paths_services <- frequency_of_use_paths_services %>%
+  rename(value = n)
+```
+
+
+```{r}
+frequency_of_use_paths_services <- frequency_of_use_paths_services %>% 
+  filter(rowname!= "unknown" & key != "unknown")
+```
+
+For Services
+
+```{r}
+#1
+frequency_of_use_paths_services_detox24_hour_hospital_inpatient <- frequency_of_use_paths_services %>%
+  ungroup() %>%
+  filter(services == "Detox, 24-hour, hospital inpatient") %>%
+  select(-services)
+
+
+
+matrix_data_services_detox24_hour_hospital_inpatient <- frequency_of_use_paths_services_detox24_hour_hospital_inpatient %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_services_detox24_hour_hospital_inpatient <- column_to_rownames(matrix_data_services_detox24_hour_hospital_inpatient, var = "rowname")
+
+matrix_data_services_detox24_hour_hospital_inpatient <- as.matrix(matrix_data_services_detox24_hour_hospital_inpatient)
+
+
+#2
+frequency_of_use_paths_services_rehab_residential_hospital_detox <- frequency_of_use_paths_services %>% 
+  ungroup() %>%
+  filter(services == "Rehab/residential, hospital (non-detox)") %>% 
+  select(-services)
+
+matrix_data_services_rehab_residential_hospital_detox <- frequency_of_use_paths_services_rehab_residential_hospital_detox %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_services_rehab_residential_hospital_detox <- column_to_rownames(matrix_data_services_rehab_residential_hospital_detox, var = "rowname")
+
+matrix_data_services_rehab_residential_hospital_detox <- as.matrix(matrix_data_services_rehab_residential_hospital_detox)
+
+
+
+
+#3
+frequency_of_use_paths_services_ambulatory_intensive_outpatient <- frequency_of_use_paths_services %>%
+  ungroup() %>% 
+  filter(services == "Ambulatory, intensive outpatient") %>% 
+  select(-services)
+
+matrix_data_services_ambulatory_intensive_outpatient <- frequency_of_use_paths_services_ambulatory_intensive_outpatient %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_services_ambulatory_intensive_outpatient <- column_to_rownames(matrix_data_services_ambulatory_intensive_outpatient, var = "rowname")
+
+matrix_data_services_ambulatory_intensive_outpatient <- as.matrix(matrix_data_services_ambulatory_intensive_outpatient)
+
+
+
+#4
+
+frequency_of_use_paths_services_ambulatory_non_intensive_outpatient <- frequency_of_use_paths_services %>% 
+  ungroup() %>% 
+  filter(services == "Ambulatory, non-intensive outpatient") %>% 
+  select(-services)
+
+matrix_data_services_ambulatory_non_intensive_outpatient <- frequency_of_use_paths_services_ambulatory_non_intensive_outpatient %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_services_ambulatory_non_intensive_outpatient <- column_to_rownames(matrix_data_services_ambulatory_non_intensive_outpatient, var = "rowname")
+
+matrix_data_services_ambulatory_non_intensive_outpatient <- as.matrix(matrix_data_services_ambulatory_non_intensive_outpatient)
+
+
+#5
+frequency_of_use_paths_services_detox24_hour_freestanding_residential <- frequency_of_use_paths_services %>% 
+  ungroup() %>% 
+  filter(services == "Detox, 24-hour, free-standing residential") %>% 
+  select(-services)
+
+matrix_data_services_detox24_hour_freestanding_residential <- frequency_of_use_paths_services_detox24_hour_freestanding_residential %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_services_detox24_hour_freestanding_residential <- column_to_rownames(matrix_data_services_detox24_hour_freestanding_residential, var = "rowname")
+
+matrix_data_services_detox24_hour_freestanding_residential <- as.matrix(matrix_data_services_detox24_hour_freestanding_residential)
+
+
+
+
+
+#6
+frequency_of_use_paths_services_rehab_residential_long_term<- frequency_of_use_paths_services %>% 
+  ungroup() %>% 
+  filter(services == "Rehab/residential, long term (more than 30 days)") %>% 
+  select(-services)
+
+matrix_data_services_rehab_residential_long_term <- frequency_of_use_paths_services_rehab_residential_long_term %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_services_rehab_residential_long_term <- column_to_rownames(matrix_data_services_rehab_residential_long_term, var = "rowname")
+
+matrix_data_services_rehab_residential_long_term <- as.matrix(matrix_data_services_rehab_residential_long_term)
+
+
+
+#7
+frequency_of_use_paths_services_rehab_residential_short_term <- frequency_of_use_paths_services %>% 
+  ungroup() %>% 
+  filter(services == "Rehab/residential, short term (30 days or fewer) ") %>% 
+  select(-services)
+
+matrix_data_services_rehab_residential_short_term  <- frequency_of_use_paths_services_rehab_residential_short_term %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_services_rehab_residential_short_term <- column_to_rownames(matrix_data_services_rehab_residential_short_term, var = "rowname")
+
+matrix_data_services_rehab_residential_short_term <- as.matrix(matrix_data_services_rehab_residential_short_term)
+
+
+
+#8
+frequency_of_use_paths_services_ambulatory_detoxification <- frequency_of_use_paths_services %>% 
+  ungroup() %>% 
+  filter(services == "Ambulatory, detoxification") %>% 
+  select(-services)
+
+matrix_data_services_ambulatory_detoxification  <- frequency_of_use_paths_services_ambulatory_detoxification %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_services_ambulatory_detoxification <- column_to_rownames(matrix_data_services_ambulatory_detoxification, var = "rowname")
+
+matrix_data_services_ambulatory_detoxification <- as.matrix(matrix_data_services_ambulatory_detoxification)
+
+
+
+```
+
+
+
+```{r}
+#1
+cols <- hcl.colors(9, "Geyser")
+colors <- c(`no use` = "#D2AD7CFF", `some use` = "#639CA4FF",
+            `daily use` = "#226060FF")
+
+chordDiagram(matrix_data_services_detox24_hour_hospital_inpatient,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+title("Detox, 24-hour, hospital inpatient")
+
+
+#2
+chordDiagram(matrix_data_services_rehab_residential_hospital_detox,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+title("Rehab/residential, hospital (non-detox)")
+
+
+#3 
+chordDiagram(matrix_data_services_ambulatory_intensive_outpatient,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+title("Ambulatory, intensive outpatient")
+
+
+#4
+chordDiagram(matrix_data_services_ambulatory_non_intensive_outpatient,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+title("Ambulatory, non-intensive outpatient")
+
+
+#5
+chordDiagram(matrix_data_services_detox24_hour_freestanding_residential,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+title("Detox, 24-hour, free-standing residential")
+
+
+#6
+chordDiagram(matrix_data_services_rehab_residential_long_term,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+title("Rehab/residential, long term (more than 30 days)")
+
+
+#7
+chordDiagram(matrix_data_services_rehab_residential_short_term,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+title("Rehab/residential, short term (30 days or fewer)")
+
+
+#8
+chordDiagram(matrix_data_services_ambulatory_detoxification,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+title("Ambulatory, detoxification")
+
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+matrix_data_use_services <- frequency_of_use_paths_services %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_use_services <- column_to_rownames(matrix_data_use_services, var = "rowname")
+
+matrix_data_use_services <- as.matrix(matrix_data_use_services)
+```
+
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(16, "Geyser")
+colors <- c(`full time` = "#D2AD7CFF", `part time` = "#639CA4FF",
+            `unemployed` = "#226060FF", `not in labor force` = "#BE7245FF")
+
+chordDiagram(frequency_of_use_paths_services,
+             #col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors,
+    scale = TRUE) 
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+Example
+
+```{r}
+# Load dataset from github
+data <- read.table("https://raw.githubusercontent.com/holtzy/data_to_viz/master/Example_dataset/13_AdjacencyDirectedWeighted.csv", header=TRUE)
+
+# short names
+colnames(data) <- c("Africa", "East Asia", "Europe", "Latin Ame.",   "North Ame.",   "Oceania", "South Asia", "South East Asia", "Soviet Union", "West.Asia")
+rownames(data) <- colnames(data)
+
+# I need a long format
+data_long <- data %>%
+  rownames_to_column %>%
+  gather(key = 'key', value = 'value', -rowname)
+
+# parameters
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+# color palette
+mycolor <- viridis(10, alpha = 1, begin = 0, end = 1, option = "D")
+mycolor <- mycolor[sample(1:10)]
+
+# Base plot
+chordDiagram(
+  x = data_long, 
+  grid.col = mycolor,
+  transparency = 0.25,
+  directional = 1,
+  direction.type = c("arrows", "diffHeight"), 
+  diffHeight  = -0.04,
+  annotationTrack = "grid", 
+  annotationTrackHeight = c(0.05, 0.1),
+  link.arr.type = "big.arrow", 
+  link.sort = TRUE, 
+  link.largest.ontop = TRUE)
+
+# Add text and axis
+circos.trackPlotRegion(
+  track.index = 1, 
+  bg.border = NA, 
+  panel.fun = function(x, y) {
+    
+    xlim = get.cell.meta.data("xlim")
+    sector.index = get.cell.meta.data("sector.index")
+    
+    # Add names to the sector. 
+    circos.text(
+      x = mean(xlim), 
+      y = 3.2, 
+      labels = sector.index, 
+      facing = "bending", 
+      cex = 0.8
+      )
+
+    # Add graduation on axis
+    circos.axis(
+      h = "top", 
+      major.at = seq(from = 0, to = xlim[2], by = ifelse(test = xlim[2]>10, yes = 2, no = 1)), 
+      minor.ticks = 1, 
+      major.tick.percentage = 0.5,
+      labels.niceFacing = FALSE)
+  }
+)
+```
+
+
+
+

@@ -1,0 +1,298 @@
+---
+title: "Treatment Completed"
+author: "Connor Flynn"
+date: "12/11/2023"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(janitor)
+library(haven)
+library(feather)
+library(arrow)
+library(chorddiag)
+library(circlize)
+library(kableExtra)
+options(scipen = 99)
+
+```
+
+Load in Data
+
+```{r}
+teds_d <- arrow::read_feather(here("data/tedsD_2012_2020.feather"))
+```
+
+
+Clean Column Names
+
+```{r}
+teds_d <- teds_d %>% 
+  clean_names()
+```
+
+
+Filter for years with admission/discharge data
+
+
+```{r}
+teds_d_select_years <- teds_d %>% 
+  filter(disyr %in% c("2015", "2016", "2017", "2018", "2019", "2020"))
+```
+
+
+
+
+Replace -9 with NA
+
+```{r}
+teds_d_select_years[teds_d_select_years == "-9"] <- NA
+```
+
+
+Relevant variables
+
+```{r}
+teds_d_select_years_relevant <- teds_d_select_years %>% 
+  select(reason, freq1, freq1_d, los, employ, employ_d, livarag, livarag_d, freq_atnd_self_help, freq_atnd_self_help_d)
+```
+
+
+
+```{r}
+table(teds_d_select_years_relevant$reason)
+```
+
+
+```{r}
+reasons <- c("1", "2")
+
+teds_d_select_years_relevant_1_2 <- teds_d_select_years_relevant %>% 
+  filter(reason %in% reasons)
+```
+
+
+```{r}
+teds_d_select_years_relevant_1_2$reason <- as.factor(teds_d_select_years_relevant_1_2$reason)
+
+ggplot(teds_d_select_years_relevant_1_2, aes(x = freq1_d, fill = reason)) +
+  geom_bar(stat = "count", position = "dodge") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal() +
+  coord_flip()
+```
+
+
+
+Chord Diagrams
+
+Completed Treatment
+
+```{r}
+teds_d_select_years_relevant_1 <- teds_d_select_years_relevant_1_2 %>% 
+  filter(reason == "1")
+```
+
+```{r}
+teds_d_select_years_relevant_1 <- teds_d_select_years_relevant_1 %>% 
+  select(freq1, freq1_d)
+
+teds_d_select_years_relevant_1 <- teds_d_select_years_relevant_1 %>%
+  mutate_at(vars(freq1, freq1_d), as.character)
+```
+
+
+```{r}
+teds_d_select_years_relevant_1[is.na(teds_d_select_years_relevant_1)] <- "unknown"
+
+teds_d_select_years_relevant_1 <- replace(teds_d_select_years_relevant_1, teds_d_select_years_relevant_1 == "1", "no use")
+
+teds_d_select_years_relevant_1 <- replace(teds_d_select_years_relevant_1, teds_d_select_years_relevant_1 == "2", "some use")
+
+teds_d_select_years_relevant_1 <- replace(teds_d_select_years_relevant_1, teds_d_select_years_relevant_1 == "3", "daily use")
+```
+
+
+```{r}
+frequency_of_use_paths_1 <- teds_d_select_years_relevant_1 %>% 
+  group_by(freq1, freq1_d) %>% 
+  count()
+```
+
+
+```{r}
+frequency_of_use_paths_1 <- frequency_of_use_paths_1 %>%
+  rename(rowname = freq1)
+
+frequency_of_use_paths_1 <- frequency_of_use_paths_1 %>%
+  rename(key = freq1_d)
+
+frequency_of_use_paths_1 <- frequency_of_use_paths_1 %>%
+  rename(value = n)
+```
+
+
+
+```{r}
+matrix_data_completed <- frequency_of_use_paths_1 %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_completed <- column_to_rownames(matrix_data_completed, var = "rowname")
+
+matrix_data_completed <- as.matrix(matrix_data_completed)
+```
+
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(16, "Geyser")
+colors <- c(`no use` = "#D2AD7CFF", `some use` = "#639CA4FF",
+            `daily use` = "#226060FF", `unknown` = "#BE7245FF")
+
+completed_chord <- chordDiagram(matrix_data_completed,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+
+completed_chord
+```
+
+
+```{r}
+completed_chord <- completed_chord %>% 
+  select(rn, cn, col, value1) %>% 
+  mutate(percentage = value1/sum(value1) *100)
+# 
+completed_chord <- completed_chord[order(-completed_chord$percentage), ]
+```
+
+
+
+```{r}
+completed_chord %>%
+  kbl(caption = "Pathways in Frequency of Use for Completed Treatments") %>%
+  kable_classic(full_width = F, html_font = "Cambria") %>% 
+  column_spec(1:6, background = completed_chord$col) 
+```
+
+
+Dropped out of Treatment 
+
+```{r}
+teds_d_select_years_relevant_2 <- teds_d_select_years_relevant_1_2 %>% 
+  filter(reason == "2")
+```
+
+```{r}
+teds_d_select_years_relevant_2 <- teds_d_select_years_relevant_2 %>% 
+  select(freq1, freq1_d)
+
+teds_d_select_years_relevant_2 <- teds_d_select_years_relevant_2 %>%
+  mutate_at(vars(freq1, freq1_d), as.character)
+```
+
+
+```{r}
+teds_d_select_years_relevant_2[is.na(teds_d_select_years_relevant_2)] <- "unknown"
+
+teds_d_select_years_relevant_2 <- replace(teds_d_select_years_relevant_2, teds_d_select_years_relevant_2 == "1", "no use")
+
+teds_d_select_years_relevant_2 <- replace(teds_d_select_years_relevant_2, teds_d_select_years_relevant_2 == "2", "some use")
+
+teds_d_select_years_relevant_2 <- replace(teds_d_select_years_relevant_2, teds_d_select_years_relevant_2 == "3", "daily use")
+```
+
+
+```{r}
+frequency_of_use_paths_2 <- teds_d_select_years_relevant_2 %>% 
+  group_by(freq1, freq1_d) %>% 
+  count()
+```
+
+
+```{r}
+frequency_of_use_paths_2 <- frequency_of_use_paths_2 %>%
+  rename(rowname = freq1)
+
+frequency_of_use_paths_2 <- frequency_of_use_paths_2 %>%
+  rename(key = freq1_d)
+
+frequency_of_use_paths_2 <- frequency_of_use_paths_2 %>%
+  rename(value = n)
+```
+
+
+
+```{r}
+matrix_data_dropped <- frequency_of_use_paths_2 %>%
+  pivot_wider(names_from = key, values_from = value, values_fill = 0)
+
+matrix_data_dropped <- column_to_rownames(matrix_data_dropped, var = "rowname")
+
+matrix_data_dropped <- as.matrix(matrix_data_dropped)
+```
+
+
+
+
+```{r}
+
+circos.clear()
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+par(mar = rep(0, 4))
+
+cols <- hcl.colors(16, "Geyser")
+colors <- c(`no use` = "#D2AD7CFF", `some use` = "#639CA4FF",
+            `daily use` = "#226060FF", `unknown` = "#BE7245FF")
+
+dropped_chord <- chordDiagram(matrix_data_dropped,
+             col = cols,
+             transparency = 0.1,
+             link.lwd = 1,    # Line width
+             link.lty = 1,    # Line type
+             link.border = 1,
+             directional = 1, direction.type = c("diffHeight", "arrows"),
+    link.arr.type = "big.arrow",
+             grid.col = colors) 
+
+dropped_chord
+
+
+
+
+```
+
+```{r}
+dropped_chord <- dropped_chord %>% 
+  select(rn, cn, col, value1) %>% 
+  mutate(percentage = value1/sum(value1) *100)
+# 
+dropped_chord <- dropped_chord[order(-dropped_chord$percentage), ]
+```
+
+
+
+```{r}
+dropped_chord %>%
+  kbl(caption = "Pathways in Frequency of Use for Dropped Out Treatments") %>%
+  kable_classic(full_width = F, html_font = "Cambria") %>% 
+  column_spec(1:6, background = dropped_chord$col) 
+```
+
+
+
