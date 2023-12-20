@@ -543,8 +543,7 @@ chordDiagram(matrix_data_self_help,
              link.border = 1,
              directional = 1, direction.type = c("diffHeight", "arrows"),
     link.arr.type = "big.arrow",
-             grid.col = colors,
-    scale = TRUE) 
+             grid.col = colors) 
 
 
 ```
@@ -848,14 +847,14 @@ los_by_state <- los_by_state %>%
 
 
 ```{r}
-ggplot(los_by_state, aes(x = los, y = reorder(state_name, median), fill = median)) +
+ggplot(los_by_state, aes(x = los, y = reorder(state_name, median))) +
   geom_boxplot(outlier.size = 0.1) +
   theme_minimal() +
-  scale_fill_viridis_c() +
+  #scale_fill_viridis_c(option = "C") +
   theme(text = element_text(size=5),
         legend.position = "none") +
   labs(title = "Length of Stay by State",
-       x = "Lenght of Stay (Days)",
+       x = "Length of Stay (Days)",
        y = "State")
 ```
 

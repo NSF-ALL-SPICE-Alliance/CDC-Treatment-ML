@@ -1,0 +1,344 @@
+---
+title: "Mapping Frequency of Use Change Binary"
+author: "Connor Flynn"
+date: "12/17/2023"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(janitor)
+library(haven)
+library(feather)
+library(arrow)
+library(chorddiag)
+library(circlize)
+library(kableExtra)
+options(scipen = 99)
+
+```
+
+Load in Data
+
+```{r}
+teds_d <- arrow::read_feather(here("data/tedsD_2012_2020.feather"))
+```
+
+
+Clean Column Names
+
+```{r}
+teds_d <- teds_d %>% 
+  clean_names()
+```
+
+
+Filter for years with admission/discharge data
+
+
+```{r}
+teds_d_select_years <- teds_d %>% 
+  filter(disyr %in% c("2015", "2016", "2017", "2018", "2019", "2020"))
+```
+
+
+
+
+Replace -9 with NA
+
+```{r}
+teds_d_select_years[teds_d_select_years == "-9"] <- NA
+```
+
+
+Relevant variables
+
+```{r}
+teds_d_select_years_relevant <- teds_d_select_years %>% 
+  select(reason, freq1, freq1_d, los, employ, employ_d, livarag, livarag_d, freq_atnd_self_help, freq_atnd_self_help_d, stfips, services_d)
+```
+
+
+
+```{r}
+teds_d_select_years_relevant <- teds_d_select_years_relevant %>% 
+  mutate_all(as.character)
+```
+
+
+```{r}
+teds_d_select_years_relevant[is.na(teds_d_select_years_relevant)] <- "unknown"
+```
+
+```{r}
+teds_d_select_years_relevant$freq1_d[teds_d_select_years_relevant$freq1_d == "1"] <- "no use"
+
+
+teds_d_select_years_relevant$freq1_d[teds_d_select_years_relevant$freq1_d == "2"] <- "some use"
+
+
+teds_d_select_years_relevant$freq1_d[teds_d_select_years_relevant$freq1_d == "3"] <- "daily use"
+
+
+teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "1"] <- "Detox, 24-hour, hospital inpatient"
+
+teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "2"] <- "Detox, 24-hour, free-standing residential"
+
+teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "3"] <- "Rehab/residential, hospital (non-detox)"
+
+teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "4"] <- "Rehab/residential, short term (30 days or fewer)"
+
+teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "5"] <- "Rehab/residential, long term (more than 30 days)"
+
+teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "6"] <- "Ambulatory, intensive outpatient"
+
+teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "7"] <- "Ambulatory, non-intensive outpatient"
+
+teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "8"] <- "Ambulatory, detoxification"
+
+
+```
+
+
+```{r}
+teds_d_select_years_relevant <- teds_d_select_years_relevant %>% 
+  mutate_all(as.factor)
+```
+
+
+```{r}
+freq_use_states <- teds_d_select_years_relevant %>% 
+  group_by(stfips, freq1_d) %>% 
+  count(name = "count") 
+```
+
+```{r}
+freq_use_states <- freq_use_states %>% 
+  group_by(stfips) %>% 
+  mutate(percentage = count / sum(count) * 100)
+```
+
+
+```{r, include=FALSE}
+data = urbnmapr::states
+```
+
+
+```{r, include=FALSE}
+freq_use_states$stfips <- sprintf('%02d', freq_use_states$stfips)
+```
+
+
+```{r, include=FALSE}
+colnames(freq_use_states)[colnames(freq_use_states) == "stfips"] <- "state_fips"
+```
+
+
+```{r, include=FALSE}
+freq_use_states <- left_join(get_urbn_map(map = "states", sf = TRUE),
+                          freq_use_states,
+                          by = "state_fips")
+```
+
+
+```{r}
+freq_use_states_no_use <- freq_use_states %>% 
+  filter(freq1_d == "no use")
+```
+
+
+```{r}
+# breaks <- seq(0, 1, by = 0.1)
+# labels <- c("0-10%", "11-20%", "21-30%", "31-40%", "41-50%", "51-60%", "61-70%", "71-80%", "81-90%", "91-100%")
+```
+
+```{r}
+ggplot(freq_use_states_no_use) +
+  geom_sf(freq_use_states_no_use,
+          mapping = aes(fill = percentage),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes") +
+   coord_sf(datum = NA)+
+  #geom_sf_text(data = get_urbn_labels(map = "territories_states", sf = TRUE), 
+                #aes(label = state_abbv), 
+            #size = 3) +
+   theme_minimal() +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        legend.text = element_text(size = 4),  # Adjust the legend text size
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4))
+```
+
+
+
+```{r}
+
+freq_use_states_no_use <- freq_use_states_no_use %>% 
+  mutate(percentage_bin = cut(percentage, breaks=c(0, 10,20,30,40,50, 60, 70, 80, 90, 100)))
+
+ggplot(freq_use_states_no_use) +
+  geom_sf(mapping = aes(fill = percentage_bin),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes",
+      title = "Completed Treatment Episodes with `no use` at Discharge",
+      subtitle = "TEDS-D 2015-2020") +
+  scale_fill_viridis_d(option = "D") +
+  coord_sf(datum = NA) +
+  theme_minimal() +
+  theme(
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    legend.text = element_text(size = 4),
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4)
+  ) 
+  
+
+
+
+
+```
+
+
+```{r}
+# Dynamically set breaks based on quantiles
+
+freq_use_states <- freq_use_states %>%
+  drop_na()
+
+
+```
+
+
+
+
+
+
+```{r}
+ggplot(freq_use_states) +
+  geom_sf(freq_use_states,
+          mapping = aes(fill = percentage),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes") +
+   coord_sf(datum = NA)+
+  #geom_sf_text(data = get_urbn_labels(map = "territories_states", sf = TRUE), 
+                #aes(label = state_abbv), 
+            #size = 3) +
+   theme_minimal() +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        legend.text = element_text(size = 4),  # Adjust the legend text size
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4)) +
+  scale_fill_viridis_c(option = "D") +
+  facet_wrap(~freq1_d)
+```
+
+```{r}
+freq_use_states <- freq_use_states %>% 
+  mutate(percentage_bin = cut(percentage, breaks=c(0, 10,20,30,40,50, 60, 70, 80, 90, 100)))
+```
+
+```{r}
+ggplot(freq_use_states) +
+  geom_sf(freq_use_states,
+          mapping = aes(fill = percentage_bin),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes",
+       title = "Completed Treatment Episodes and Frequency of Use at Discharge",
+       subtitle = "TEDS-D 2015-2020") +
+   coord_sf(datum = NA)+
+  #geom_sf_text(data = get_urbn_labels(map = "territories_states", sf = TRUE), 
+                #aes(label = state_abbv), 
+            #size = 3) +
+   theme_minimal() +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        legend.text = element_text(size = 4),  # Adjust the legend text size
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4)) +
+  scale_fill_viridis_d(option = "D") +
+  facet_wrap(~freq1_d)
+```
+
+
+
+```{r}
+services_by_state <- teds_d_select_years_relevant %>% 
+  group_by(stfips, services_d) %>% 
+  count(name = "number_in_service")
+  
+```
+
+
+```{r}
+services_by_state <- services_by_state %>% 
+  group_by(stfips) %>% 
+  mutate(percent_in_service = number_in_service / sum(number_in_service) * 100)
+```
+
+```{r}
+services_by_state <- services_by_state %>% 
+  mutate(services_percentage_bin = cut(percent_in_service, breaks=c(0, 10,20,30,40,50, 60, 70, 80, 90, 100)))
+```
+
+
+```{r, include=FALSE}
+services_by_state$stfips <- sprintf('%02d', services_by_state$stfips)
+```
+
+
+```{r, include=FALSE}
+colnames(services_by_state)[colnames(services_by_state) == "stfips"] <- "state_fips"
+```
+
+
+```{r, include=FALSE}
+services_by_state <- left_join(get_urbn_map(map = "states", sf = TRUE),
+                          services_by_state,
+                          by = "state_fips")
+```
+
+```{r}
+services_by_state <- services_by_state %>% 
+  drop_na()
+```
+
+
+```{r}
+ggplot(services_by_state) +
+  geom_sf(services_by_state,
+          mapping = aes(fill = services_percentage_bin),
+          color = "#ffffff", size = 0.25) +
+  labs(fill = "% of Treatment Episodes",
+       title = "Percentage of Treatment Episodes in Services by State",
+       subtitle = "TEDS-D 2015-2020") +
+   coord_sf(datum = NA)+
+  #geom_sf_text(data = get_urbn_labels(map = "territories_states", sf = TRUE), 
+                #aes(label = state_abbv), 
+            #size = 3) +
+   theme_minimal() +
+  theme(panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        legend.text = element_text(size = 4),  # Adjust the legend text size
+    legend.title = element_text(size = 5),
+    strip.text = element_text(size = 4)) +
+  scale_fill_viridis_d(option = "D") +
+  facet_wrap(~services_d)
+```
+
