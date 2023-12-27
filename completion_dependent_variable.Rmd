@@ -212,8 +212,8 @@ completed_chord <- chordDiagram(matrix_data_completed,
              directional = 1, direction.type = c("diffHeight", "arrows"),
     link.arr.type = "big.arrow",
              grid.col = colors) 
-
-completed_chord
+title("Frequency of Use from Admission to Discharge", line = -1, sub = "Completed Treatments")
+#completed_chord
 ```
 
 
@@ -223,6 +223,17 @@ completed_chord <- completed_chord %>%
   mutate(percentage = value1/sum(value1) *100)
 # 
 completed_chord <- completed_chord[order(-completed_chord$percentage), ]
+
+colnames(completed_chord)[colnames(completed_chord) == "rn"] ="Admission"
+
+colnames(completed_chord)[colnames(completed_chord) == "cn"] ="Discharge"
+
+colnames(completed_chord)[colnames(completed_chord) == "value1"] ="Treatment Episodes"
+
+colnames(completed_chord)[colnames(completed_chord) == "percentage"] ="Percentage"
+
+
+completed_chord$Percentage <- round(completed_chord$Percentage, digit = 2)
 ```
 
 
@@ -231,7 +242,10 @@ completed_chord <- completed_chord[order(-completed_chord$percentage), ]
 completed_chord %>%
   kbl(caption = "Pathways in Frequency of Use for Completed Treatments") %>%
   kable_classic(full_width = F, html_font = "Cambria") %>% 
-  column_spec(1:6, background = completed_chord$col) 
+  column_spec(1:6, background = completed_chord$col) %>% 
+  kableExtra::remove_column(1) %>% 
+  kableExtra::remove_column(3)
+
 ```
 
 
@@ -322,8 +336,9 @@ dropped_chord <- chordDiagram(matrix_data_dropped,
              directional = 1, direction.type = c("diffHeight", "arrows"),
     link.arr.type = "big.arrow",
              grid.col = colors) 
+title("Frequency of Use from Admission to Discharge", line = -1, sub = "Dropped Out Treatments")
 
-dropped_chord
+#dropped_chord
 
 
 
@@ -336,6 +351,18 @@ dropped_chord <- dropped_chord %>%
   mutate(percentage = value1/sum(value1) *100)
 # 
 dropped_chord <- dropped_chord[order(-dropped_chord$percentage), ]
+
+
+colnames(dropped_chord)[colnames(dropped_chord) == "rn"] ="Admission"
+
+colnames(dropped_chord)[colnames(dropped_chord) == "cn"] ="Discharge"
+
+colnames(dropped_chord)[colnames(dropped_chord) == "value1"] ="Treatment Episodes"
+
+colnames(dropped_chord)[colnames(dropped_chord) == "percentage"] ="Percentage"
+
+
+dropped_chord$Percentage <- round(dropped_chord$Percentage, digit = 2)
 ```
 
 
@@ -344,7 +371,9 @@ dropped_chord <- dropped_chord[order(-dropped_chord$percentage), ]
 dropped_chord %>%
   kbl(caption = "Pathways in Frequency of Use for Dropped Out Treatments") %>%
   kable_classic(full_width = F, html_font = "Cambria") %>% 
-  column_spec(1:6, background = dropped_chord$col) 
+  column_spec(1:6, background = dropped_chord$col) %>% 
+  kableExtra::remove_column(1) %>% 
+  kableExtra::remove_column(3)
 ```
 
 ```{r}
@@ -449,7 +478,7 @@ completed_chord_employment <- chordDiagram(matrix_data_employment,
              directional = 1, direction.type = c("diffHeight", "arrows"),
     link.arr.type = "big.arrow",
              grid.col = colors) 
-
+title("Employment from Admission to Discharge", line = -1, sub = "Completed Treatments")
 
 
 
@@ -460,6 +489,18 @@ completed_chord_employment <- completed_chord_employment %>%
   mutate(percentage = value1/sum(value1) *100)
 # 
 completed_chord_employment <- completed_chord_employment[order(-completed_chord_employment$percentage), ]
+
+
+colnames(completed_chord_employment)[colnames(completed_chord_employment) == "rn"] ="Admission"
+
+colnames(completed_chord_employment)[colnames(completed_chord_employment) == "cn"] ="Discharge"
+
+colnames(completed_chord_employment)[colnames(completed_chord_employment) == "value1"] ="Treatment Episodes"
+
+colnames(completed_chord_employment)[colnames(completed_chord_employment) == "percentage"] ="Percentage"
+
+
+completed_chord_employment$Percentage <- round(completed_chord_employment$Percentage, digit = 2)
 ```
 
 
@@ -468,7 +509,10 @@ completed_chord_employment <- completed_chord_employment[order(-completed_chord_
 completed_chord_employment %>%
   kbl(caption = "Pathways in Employment for Completed Treatments") %>%
   kable_classic(full_width = F, html_font = "Cambria") %>% 
-  column_spec(1:6, background = dropped_chord$col) 
+  column_spec(1:6, background = dropped_chord$col) %>% 
+  kableExtra::remove_column(1) %>% 
+  kableExtra::remove_column(3)
+  
 ```
 
 Dropped
@@ -561,7 +605,7 @@ dropped_chord_employment <- chordDiagram(matrix_data_employment_dropped,
              directional = 1, direction.type = c("diffHeight", "arrows"),
     link.arr.type = "big.arrow",
              grid.col = colors) 
-
+title("Employment from Admission to Discharge", line = -1, sub = "Dropped Treatments")
 
 
 
@@ -681,6 +725,8 @@ completed_chord_housing <- chordDiagram(matrix_data_housing,
     link.arr.type = "big.arrow",
              grid.col = colors) 
 
+title("Living Arrangement from Admission to Discharge", line = -1, sub = "Completed Treatments")
+
 
 
 
@@ -794,6 +840,8 @@ dropped_chord_housing <- chordDiagram(matrix_data_housing_dropped,
              directional = 1, direction.type = c("diffHeight", "arrows"),
     link.arr.type = "big.arrow",
              grid.col = colors) 
+
+title("Living Arrangement from Admission to Discharge", line = -1, sub = "Dropped Treatments")
 
 
 
