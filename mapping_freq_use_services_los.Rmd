@@ -18,6 +18,9 @@ library(arrow)
 library(chorddiag)
 library(circlize)
 library(kableExtra)
+library(urbnmapr)
+library(forcats)
+library(sf)
 options(scipen = 99)
 
 ```
@@ -55,14 +58,14 @@ teds_d_select_years[teds_d_select_years == "-9"] <- NA
 ```
 
 
-Relevant variables
+Relevant variables to decrease size of large dataframe
 
 ```{r}
 teds_d_select_years_relevant <- teds_d_select_years %>% 
-  select(reason, freq1, freq1_d, los, employ, employ_d, livarag, livarag_d, freq_atnd_self_help, freq_atnd_self_help_d, stfips, services_d)
+  select(reason, freq1, freq1_d, los, employ, employ_d, livarag, livarag_d, freq_atnd_self_help, freq_atnd_self_help_d, stfips, services_d, los)
 ```
 
-
+Mutate as character to replace na with unknown in next chunk
 
 ```{r}
 teds_d_select_years_relevant <- teds_d_select_years_relevant %>% 
@@ -73,6 +76,8 @@ teds_d_select_years_relevant <- teds_d_select_years_relevant %>%
 ```{r}
 teds_d_select_years_relevant[is.na(teds_d_select_years_relevant)] <- "unknown"
 ```
+
+Replace frequency of use / services codes with meaning
 
 ```{r}
 teds_d_select_years_relevant$freq1_d[teds_d_select_years_relevant$freq1_d == "1"] <- "no use"
@@ -103,6 +108,7 @@ teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d 
 
 ```
 
+Mutate all as factor
 
 ```{r}
 teds_d_select_years_relevant <- teds_d_select_years_relevant %>% 
@@ -110,11 +116,22 @@ teds_d_select_years_relevant <- teds_d_select_years_relevant %>%
 ```
 
 
+*Select for only completed treatments*
+
 ```{r}
-freq_use_states <- teds_d_select_years_relevant %>% 
+teds_d_select_years_relevant_completed <- teds_d_select_years_relevant %>% 
+  filter(reason == "1")
+```
+
+Count the freq1_d classes for all states
+
+```{r}
+freq_use_states <- teds_d_select_years_relevant_completed %>% 
   group_by(stfips, freq1_d) %>% 
   count(name = "count") 
 ```
+
+Calculate percentage (each state should equal 100)
 
 ```{r}
 freq_use_states <- freq_use_states %>% 
@@ -122,27 +139,32 @@ freq_use_states <- freq_use_states %>%
   mutate(percentage = count / sum(count) * 100)
 ```
 
+Bring in map data
 
 ```{r, include=FALSE}
 data = urbnmapr::states
 ```
 
+Change fips to match map 
 
 ```{r, include=FALSE}
 freq_use_states$stfips <- sprintf('%02d', freq_use_states$stfips)
 ```
 
+Change column name to match map
 
 ```{r, include=FALSE}
 colnames(freq_use_states)[colnames(freq_use_states) == "stfips"] <- "state_fips"
 ```
 
-
+Join frequency ouf use - state data with mapping data
 ```{r, include=FALSE}
 freq_use_states <- left_join(get_urbn_map(map = "states", sf = TRUE),
                           freq_use_states,
                           by = "state_fips")
 ```
+
+Filter for no use for zoomed in map
 
 
 ```{r}
@@ -155,6 +177,10 @@ freq_use_states_no_use <- freq_use_states %>%
 # breaks <- seq(0, 1, by = 0.1)
 # labels <- c("0-10%", "11-20%", "21-30%", "31-40%", "41-50%", "51-60%", "61-70%", "71-80%", "81-90%", "91-100%")
 ```
+
+
+Plot 
+
 
 ```{r}
 ggplot(freq_use_states_no_use) +
@@ -176,7 +202,7 @@ ggplot(freq_use_states_no_use) +
     strip.text = element_text(size = 4))
 ```
 
-
+Add color bins
 
 ```{r}
 
@@ -220,7 +246,7 @@ freq_use_states <- freq_use_states %>%
 
 
 
-
+facet into 4 frequency of use classes
 
 
 ```{r}
@@ -244,6 +270,9 @@ ggplot(freq_use_states) +
   scale_fill_viridis_c(option = "D") +
   facet_wrap(~freq1_d)
 ```
+
+Add color scale
+
 
 ```{r}
 freq_use_states <- freq_use_states %>% 
@@ -275,9 +304,46 @@ ggplot(freq_use_states) +
 ```
 
 
+Staccked
+
 
 ```{r}
-services_by_state <- teds_d_select_years_relevant %>% 
+
+# Reorder the levels of freq1_d column
+freq_use_states$freq1_d <- factor(freq_use_states$freq1_d, 
+                                  levels = c("no use", "some use", "daily use", "unknown"))
+
+# Remove duplicates in state_name based on the percentage where freq1_d == "no use"
+distinct_states <- freq_use_states %>%
+  filter(freq1_d == "no use") %>%
+  arrange(percentage) %>%
+  select(state_name) %>%
+  distinct()
+
+# Reorder state_name based on the percentage where freq1_d == "no use"
+freq_use_states <- freq_use_states %>%
+  arrange(freq1_d, percentage) %>%
+  mutate(state_name = factor(state_name, levels = distinct_states$state_name))
+
+# Plot with reversed fill order
+ggplot(freq_use_states, aes(x = percentage, y = state_name, fill = forcats::fct_rev(freq1_d))) +
+  geom_bar(position = "stack", stat = "identity") +
+  theme_minimal() +
+  scale_fill_viridis_d() +
+  labs(fill = "Frequency of Use",
+       y = "", 
+       x = "Treatment Episodes (%)",
+  title = "Frequency of Use at Discharge",
+  subtitle = "TEDS-D Completed Treatment Episodes") +
+  guides(fill = guide_legend(reverse = TRUE))
+```
+
+
+
+Calculate the percentage of treatment episodesthat fall into each service for each state
+
+```{r}
+services_by_state <- teds_d_select_years_relevant_completed %>% 
   group_by(stfips, services_d) %>% 
   count(name = "number_in_service")
   
@@ -324,7 +390,7 @@ ggplot(services_by_state) +
           mapping = aes(fill = services_percentage_bin),
           color = "#ffffff", size = 0.25) +
   labs(fill = "% of Treatment Episodes",
-       title = "Percentage of Treatment Episodes in Services by State",
+       title = "Percentage of Completed Treatment Episodes in Services by State",
        subtitle = "TEDS-D 2015-2020") +
    coord_sf(datum = NA)+
   #geom_sf_text(data = get_urbn_labels(map = "territories_states", sf = TRUE), 
@@ -340,5 +406,102 @@ ggplot(services_by_state) +
     strip.text = element_text(size = 4)) +
   scale_fill_viridis_d(option = "D") +
   facet_wrap(~services_d)
+```
+Stacked
+
+```{r}
+ggplot(services_by_state, aes(x = percent_in_service, y = state_name, fill = forcats::fct_rev(services_d))) +
+  geom_bar(position = "stack", stat = "identity") +
+  theme_minimal() +
+  scale_fill_viridis_d() +
+  labs(fill = "Frequency of Use",
+       y = "", 
+       x = "Treatment Episodes (%)",
+  title = "Frequency of Use at Discharge",
+  subtitle = "TEDS-D Completed Treatment Episodes") +
+  guides(fill = guide_legend(reverse = TRUE))
+```
+
+
+
+
+
+Median LOS by State
+
+Colored Boxplot by %no use
+
+```{r}
+teds_d_select_years_relevant_completed$stfips <- sprintf('%02d',teds_d_select_years_relevant_completed$stfips)
+
+colnames(teds_d_select_years_relevant_completed)[colnames(teds_d_select_years_relevant_completed) == "stfips"] <- "state_fips"
+```
+
+
+```{r}
+freq_use_states_no_geo <- freq_use_states %>% 
+  st_drop_geometry()
+```
+
+Check on lost data
+
+```{r}
+teds_d_select_years_relevant_completed_freq_use_states <- right_join(teds_d_select_years_relevant_completed, freq_use_states_no_geo,
+                                                                    by = c("state_fips", "freq1_d"))
+```
+
+```{r}
+teds_d_select_years_relevant_completed_freq_use_states$los <- as.numeric(teds_d_select_years_relevant_completed_freq_use_states$los)
+```
+
+
+```{r}
+teds_d_select_years_relevant_completed_freq_use_states <- teds_d_select_years_relevant_completed_freq_use_states %>% 
+  group_by(state_name) %>% 
+  mutate(median = median(los, na.rm = TRUE))
+```
+
+```{r}
+ggplot(teds_d_select_years_relevant_completed_freq_use_states, aes(x = los, y = reorder(state_name, median))) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_minimal() +
+  #scale_fill_viridis_c(option = "C") +
+  theme(text = element_text(size=5),
+        legend.position = "none") +
+  labs(title = "Length of Stay by State",
+       x = "Length of Stay (Days)",
+       y = "State")
+```
+
+```{r}
+ggplot(teds_d_select_years_relevant_completed_freq_use_states, aes(x = los, y = reorder(state_name, median))) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_minimal() +
+  #scale_fill_viridis_c(option = "C") +
+  theme(text = element_text(size=5),
+        legend.position = "none") +
+  labs(title = "Length of Stay by State",
+       x = "Length of Stay (Days)",
+       y = "State") +
+  facet_grid(~freq1_d)
+```
+
+Check 
+
+```{r}
+teds_d_select_years_relevant_completed$los <- as.numeric(teds_d_select_years_relevant_completed$los) 
+
+median_los_completed <- teds_d_select_years_relevant_completed %>% 
+  group_by(stfips) %>% 
+  mutate(median = median(los, na.rm = TRUE)) 
+  
+mean_los_completed <- teds_d_select_years_relevant_completed %>% 
+  group_by(stfips) %>% 
+  mutate(mean = mean(los, na.rm = TRUE)) 
+
+teds_d_select_years_relevant$los <- as.numeric(teds_d_select_years_relevant$los) 
+
+median_los<- teds_d_select_years_relevant %>% 
+  group_by(stfips) %>% 
+  mutate(median = median(los, na.rm = TRUE)) 
 ```
 

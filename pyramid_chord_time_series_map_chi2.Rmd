@@ -98,7 +98,7 @@ relevant_data <- teds_d_select_years_completed_outcomes_aggregated %>%
   select(freq1, freq1_d, frequency_of_use_change_specific, frequency_of_use_change_aggregate,
                               livarag, livarag_d, living_arrangement_change_specific, living_arrangement_change_aggregate,
                               employ, employ_d, employment_change_specific, employment_change_aggregate,
-                              freq_atnd_self_help, freq_atnd_self_help_d, self_help_change_aggregate, self_help_change_specific, services, services_d, los, stfips)
+                              freq_atnd_self_help, freq_atnd_self_help_d, self_help_change_aggregate, self_help_change_specific, services, services_d, los, stfips, reason)
 ```
 
 
