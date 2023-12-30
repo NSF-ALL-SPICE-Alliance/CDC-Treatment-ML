@@ -505,3 +505,47 @@ median_los<- teds_d_select_years_relevant %>%
   mutate(median = median(los, na.rm = TRUE)) 
 ```
 
+
+
+LOS Binned
+
+
+```{r}
+# Create a new variable 'LOS_binned'
+teds_d_select_years_relevant_completed_freq_use_states$los_binned <- cut(
+  teds_d_select_years_relevant_completed_freq_use_states$los,
+  breaks = c(0, 1, 5, 10, 20, 30, 31, 32, 33, 34, 35, 36, 37),
+  labels = c('1 day', '2-5 days', '6-10 days', '11-20 days', '21-30 days', '31-45 days', '46-60 days', '61-90 days', '91-120 days', '121-180 days', '181-365', '>365 days'),
+  include.lowest = TRUE
+)
+
+# Check the frequency table of the new variable
+teds_d_select_years_relevant_completed_freq_use_states %>% 
+  select(los, los_binned)
+```
+
+
+```{r}
+los_binned_by_state <- teds_d_select_years_relevant_completed_freq_use_states %>% 
+  group_by(state_name, los_binned) %>% 
+  count()
+```
+
+```{r}
+los_binned_by_state <- los_binned_by_state %>% 
+  group_by(state_name) %>% 
+  mutate(percent_in_los = n / sum(n) * 100)
+```
+
+```{r}
+ggplot(los_binned_by_state, aes(x = percent_in_los, y = state_name, fill = forcats::fct_rev(los_binned))) +
+  geom_bar(position = "stack", stat = "identity") +
+  theme_minimal() +
+  scale_fill_viridis_d() +
+  labs(fill = "Length of Stay",
+       y = "", 
+       x = "Treatment Episodes (%)",
+  title = "LOS by State",
+  subtitle = "TEDS-D Completed Treatment Episodes") +
+  guides(fill = guide_legend(reverse = TRUE))
+```
