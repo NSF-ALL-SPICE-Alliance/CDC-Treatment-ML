@@ -147,20 +147,37 @@ data = urbnmapr::states
 
 Change fips to match map 
 
+```{r}
+freq_use_states$stfips <- as.numeric(freq_use_states$stfips)
+```
+
+
 ```{r, include=FALSE}
-freq_use_states$stfips <- sprintf('%02d', freq_use_states$stfips)
+freq_use_states$stfips_new <- sprintf('%02d', freq_use_states$stfips)
 ```
 
 Change column name to match map
 
 ```{r, include=FALSE}
-colnames(freq_use_states)[colnames(freq_use_states) == "stfips"] <- "state_fips"
+colnames(freq_use_states)[colnames(freq_use_states) == "stfips_new"] <- "state_fips"
 ```
+
+```{r}
+freq_use_states$state_fips <- as.character(freq_use_states$state_fips)
+```
+
+
+```{r}
+states_map <- get_urbn_map(map = "states", sf = TRUE)
+```
+
 
 Join frequency ouf use - state data with mapping data
 ```{r, include=FALSE}
-freq_use_states <- left_join(get_urbn_map(map = "states", sf = TRUE),
-                          freq_use_states,
+
+
+freq_use_states <- left_join(freq_use_states,
+                          states_map,
                           by = "state_fips")
 ```
 
@@ -251,8 +268,7 @@ facet into 4 frequency of use classes
 
 ```{r}
 ggplot(freq_use_states) +
-  geom_sf(freq_use_states,
-          mapping = aes(fill = percentage),
+  geom_sf(mapping = aes(fill = percentage),
           color = "#ffffff", size = 0.25) +
   labs(fill = "% of Treatment Episodes") +
    coord_sf(datum = NA)+
