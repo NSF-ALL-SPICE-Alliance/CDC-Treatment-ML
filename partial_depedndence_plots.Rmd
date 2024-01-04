@@ -1,0 +1,336 @@
+---
+title: "Partial Dependence Plots"
+author: "Connor Flynn"
+date: "1/3/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+```
+
+
+*State*
+
+```{r}
+pdp_stfips <- read_csv(here("data/pdp_stfips.csv"))
+```
+
+Replace fips code with state name
+
+```{r}
+state_info <- data.frame(
+  stfips = c(1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 42, 44, 45, 46, 47, 48, 49, 50, 51, 55, 56, 72),
+  State = c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Wisconsin", "Wyoming", "Puerto Rico")
+)
+```
+
+Merge Dataframes
+
+```{r}
+pdp_stfips_names <- merge(pdp_stfips, state_info, by = "stfips", all.x = TRUE)
+```
+
+
+Plot
+
+```{r}
+ggplot(pdp_stfips_names, aes(y = reorder(State, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+
+*Length of Stay (Binned)*
+
+
+```{r}
+pdp_los_binned <- read_csv(here("data/pdp_los_binned.csv"))
+```
+
+
+Plot
+
+```{r}
+ggplot(pdp_los_binned, aes(y = reorder(los_binned, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+
+
+*Services*
+
+```{r}
+pdp_services <- read_csv(here("data/pdp_services.csv"))
+```
+
+Replace services codes with label
+
+```{r}
+pdp_services$services_d[pdp_services$services_d == "1"] <- "Detox, 24-hour, hospital inpatient"
+
+pdp_services$services_d[pdp_services$services_d == "2"] <- "Detox, 24-hour, free-standing residential"
+
+pdp_services$services_d[pdp_services$services_d == "3"] <- "Rehab/residential, hospital (non-detox)"
+
+pdp_services$services_d[pdp_services$services_d == "4"] <- "Rehab/residential, short term (30 days or fewer)"
+
+pdp_services$services_d[pdp_services$services_d == "5"] <- "Rehab/residential, long term (more than 30 days)"
+
+pdp_services$services_d[pdp_services$services_d == "6"] <- "Ambulatory, intensive outpatient"
+
+pdp_services$services_d[pdp_services$services_d == "7"] <- "Ambulatory, non-intensive outpatient"
+
+pdp_services$services_d[pdp_services$services_d == "8"] <- "Ambulatory, detoxification"
+
+```
+
+
+
+
+Plot
+
+```{r}
+ggplot(pdp_services, aes(y = reorder(services_d, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+
+*Referral Source*
+
+
+```{r}
+pdp_referral <- read_csv(here("data/pdp_referral.csv"))
+```
+
+
+Replace services codes with label
+
+```{r}
+pdp_referral$psource[pdp_referral$psource == "1"] <- "Individual"
+
+pdp_referral$psource[pdp_referral$psource == "2"] <- "Alcohol/drug use care provider"
+
+pdp_referral$psource[pdp_referral$psource == "3"] <- "Other health care provider"
+
+pdp_referral$psource[pdp_referral$psource == "4"] <- "School"
+
+pdp_referral$psource[pdp_referral$psource == "5"] <- "Employer/EAP"
+
+pdp_referral$psource[pdp_referral$psource == "6"] <- "Other community referral"
+
+pdp_referral$psource[pdp_referral$psource == "7"] <- "Court/criminal justice referral/DUI/DWI"
+
+
+```
+
+Plot
+
+```{r}
+ggplot(pdp_referral, aes(y = reorder(psource, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+*Self Help at Discharge*
+
+```{r}
+pdp_self_help <- read_csv(here("data/pdp_self_help.csv"))
+```
+
+
+Replace services codes with label
+
+```{r}
+pdp_self_help$freq_atnd_self_help_d[pdp_self_help$freq_atnd_self_help_d == "1"] <- "No attendance"
+
+pdp_self_help$freq_atnd_self_help_d[pdp_self_help$freq_atnd_self_help_d == "2"] <- "1-3 times in the past month"
+
+pdp_self_help$freq_atnd_self_help_d[pdp_self_help$freq_atnd_self_help_d == "3"] <- "4-7 times in the past month"
+
+pdp_self_help$freq_atnd_self_help_d[pdp_self_help$freq_atnd_self_help_d == "4"] <- "8-30 times in the past month"
+
+pdp_self_help$freq_atnd_self_help_d[pdp_self_help$freq_atnd_self_help_d == "5"] <- "Some attendance, frequency is unknown"
+
+```
+
+
+
+
+Plot
+
+```{r}
+ggplot(pdp_self_help, aes(y = reorder(freq_atnd_self_help_d, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+
+*Living Arrangement Change Aggregate*
+
+```{r}
+pdp_living_arrangement_change_aggregate <- read_csv(here("data/pdp_living_arrangement_change_aggregate.csv"))
+```
+
+
+Plot
+
+```{r}
+ggplot(pdp_living_arrangement_change_aggregate, aes(y = reorder(living_arrangement_change_aggregate, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+*Employment Change Aggregate*
+
+```{r}
+pdp_employment_change_aggregate <- read_csv(here("data/pdp_employment_change_aggregate.csv"))
+```
+
+
+Plot
+
+```{r}
+ggplot(pdp_employment_change_aggregate, aes(y = reorder(employment_change_aggregate, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+*Region*
+
+```{r}
+pdp_region <- read_csv(here("data/pdp_region.csv"))
+```
+
+Replace services codes with label
+
+```{r}
+pdp_region$region[pdp_region$region == "0"] <- "U.S. territories"
+
+pdp_region$region[pdp_region$region == "1"] <- "Northeast"
+
+pdp_region$region[pdp_region$region == "2"] <- "Midwest"
+
+pdp_region$region[pdp_region$region == "3"] <- "South"
+
+pdp_region$region[pdp_region$region == "4"] <- "West"
+
+
+```
+
+
+Plot
+
+```{r}
+ggplot(pdp_region, aes(y = reorder(region, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+Merge Data
+
+```{r}
+pdp_los_binned$feature <- "los_binned"
+pdp_services$feature <- "services_d"
+pdp_stfips_names$feature <- "state"
+#pdp_division$feature <- "division"
+pdp_region$feature <- "region"
+pdp_referral$feature <- "referral"
+pdp_living_arrangement_change_aggregate$feature <- "living_arrangement_change_aggregate"
+pdp_employment_change_aggregate$feature <- "employment_change_aggregate"
+pdp_self_help$feature <- "self_help"
+```
+
+
+```{r}
+head(pdp_los_binned)
+head(pdp_services)
+head(pdp_stfips_names)
+head(pdp_region)
+head(pdp_referral)
+
+```
+
+
+```{r}
+df_list <- list(pdp_los_binned,
+              pdp_services,
+            # pdp_stfips_names,
+             pdp_region,
+             pdp_referral,
+             pdp_living_arrangement_change_aggregate,
+             pdp_employment_change_aggregate,
+             pdp_self_help)
+
+```
+
+
+```{r}
+pdp_joined <- Reduce(full_join, df_list)
+```
+
+
+```{r}
+pdp_joined_longer <- pdp_joined %>% 
+  #select(-stfips) %>% 
+  pivot_longer(cols = c("los_binned",
+                        "services_d",
+                        #"State",
+                        "region",
+                        "psource",
+                        "living_arrangement_change_aggregate",
+                        "employment_change_aggregate",
+                        "freq_atnd_self_help_d"),
+               names_to = "description",
+               values_to = "values") %>% 
+  drop_na() %>% 
+  select(-description)
+```
+
+
+Plot Joined Data
+
+```{r}
+ggplot(pdp_joined_longer, aes(y = reorder(values, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "") +
+  facet_wrap(~feature, scales = "free_y", ncol = 1) +
+  theme(axis.text.y = element_text(size = 4),
+        axis.text.x = element_text(size = 4),
+        strip.text = element_text(size = 4),
+        plot.title = element_text(size = 8),
+        axis.title = element_text(size = 5))
+```
+
+
