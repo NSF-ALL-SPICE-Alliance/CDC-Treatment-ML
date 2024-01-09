@@ -50,14 +50,6 @@ teds_d_select_years <- teds_d %>%
 
 
 
-
-Replace -9 with NA
-
-```{r}
-teds_d_select_years[teds_d_select_years == "-9"] <- NA
-```
-
-
 Relevant variables to decrease size of large dataframe
 
 ```{r}
@@ -65,21 +57,31 @@ teds_d_select_years_relevant <- teds_d_select_years %>%
   select(reason, freq1, freq1_d, los, employ, employ_d, livarag, livarag_d, freq_atnd_self_help, freq_atnd_self_help_d, stfips, services_d, los)
 ```
 
-Mutate as character to replace na with unknown in next chunk
+Replace -9 with NA
 
 ```{r}
-teds_d_select_years_relevant <- teds_d_select_years_relevant %>% 
-  mutate_all(as.character)
+teds_d_select_years_relevant[teds_d_select_years_relevant == "-9"] <- NA
 ```
 
 
-```{r}
-teds_d_select_years_relevant[is.na(teds_d_select_years_relevant)] <- "unknown"
-```
+
+<!-- Mutate as character to replace na with unknown in next chunk -->
+
+<!-- ```{r} -->
+<!-- teds_d_select_years_relevant <- teds_d_select_years_relevant %>%  -->
+<!--   mutate_all(as.character) -->
+<!-- ``` -->
+
+
+# ```{r}
+# teds_d_select_years_relevant[is.na(teds_d_select_years_relevant)] <- "unknown"
+# ```
 
 Replace frequency of use / services codes with meaning
 
 ```{r}
+teds_d_select_years_relevant$freq1_d <- as.character(teds_d_select_years_relevant$freq1_d)
+
 teds_d_select_years_relevant$freq1_d[teds_d_select_years_relevant$freq1_d == "1"] <- "no use"
 
 
@@ -87,6 +89,15 @@ teds_d_select_years_relevant$freq1_d[teds_d_select_years_relevant$freq1_d == "2"
 
 
 teds_d_select_years_relevant$freq1_d[teds_d_select_years_relevant$freq1_d == "3"] <- "daily use"
+
+teds_d_select_years_relevant$freq1_d[is.na(teds_d_select_years_relevant$freq1_d)] <- "unknown"
+
+```
+
+
+```{r}
+
+teds_d_select_years_relevant$services_d <- as.character(teds_d_select_years_relevant$services_d)
 
 
 teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "1"] <- "Detox, 24-hour, hospital inpatient"
@@ -105,14 +116,16 @@ teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d 
 
 teds_d_select_years_relevant$services_d[teds_d_select_years_relevant$services_d == "8"] <- "Ambulatory, detoxification"
 
+teds_d_select_years_relevant$services_d[is.na(teds_d_select_years_relevant$services_d)] <- "unknown"
+
 
 ```
 
 Mutate all as factor
 
 ```{r}
-teds_d_select_years_relevant <- teds_d_select_years_relevant %>% 
-  mutate_all(as.factor)
+# teds_d_select_years_relevant <- teds_d_select_years_relevant %>% 
+#   mutate_all(as.factor)
 ```
 
 
@@ -142,28 +155,36 @@ freq_use_states <- freq_use_states %>%
 Bring in map data
 
 ```{r, include=FALSE}
-data = urbnmapr::states
+#data = urbnmapr::states
 ```
 
 Change fips to match map 
 
 ```{r}
-freq_use_states$stfips <- as.numeric(freq_use_states$stfips)
+#freq_use_states$stfips <- as.numeric(freq_use_states$stfips)
 ```
 
 
 ```{r, include=FALSE}
-freq_use_states$stfips_new <- sprintf('%02d', freq_use_states$stfips)
+freq_use_states$stfips_recode <- sprintf('%02d', freq_use_states$stfips)
 ```
+
+```{r}
+freq_use_states %>%  
+  select(stfips, stfips_recode) %>% 
+  unique()
+```
+
+
 
 Change column name to match map
 
 ```{r, include=FALSE}
-colnames(freq_use_states)[colnames(freq_use_states) == "stfips_new"] <- "state_fips"
+colnames(freq_use_states)[colnames(freq_use_states) == "stfips_recode"] <- "state_fips"
 ```
 
 ```{r}
-freq_use_states$state_fips <- as.character(freq_use_states$state_fips)
+#freq_use_states$state_fips <- as.character(freq_use_states$state_fips)
 ```
 
 
@@ -202,7 +223,7 @@ Plot
 ```{r}
 ggplot(freq_use_states_no_use) +
   geom_sf(freq_use_states_no_use,
-          mapping = aes(fill = percentage),
+          mapping = aes(geometry = geometry, fill = percentage),
           color = "#ffffff", size = 0.25) +
   labs(fill = "% of Treatment Episodes") +
    coord_sf(datum = NA)+
@@ -227,7 +248,7 @@ freq_use_states_no_use <- freq_use_states_no_use %>%
   mutate(percentage_bin = cut(percentage, breaks=c(0, 10,20,30,40,50, 60, 70, 80, 90, 100)))
 
 ggplot(freq_use_states_no_use) +
-  geom_sf(mapping = aes(fill = percentage_bin),
+  geom_sf(mapping = aes(geometry = geometry, fill = percentage_bin),
           color = "#ffffff", size = 0.25) +
   labs(fill = "% of Treatment Episodes",
       title = "Completed Treatment Episodes with `no use` at Discharge",
@@ -255,8 +276,8 @@ ggplot(freq_use_states_no_use) +
 ```{r}
 # Dynamically set breaks based on quantiles
 
-freq_use_states <- freq_use_states %>%
-  drop_na()
+# freq_use_states <- freq_use_states %>%
+#   drop_na()
 
 
 ```
@@ -268,7 +289,7 @@ facet into 4 frequency of use classes
 
 ```{r}
 ggplot(freq_use_states) +
-  geom_sf(mapping = aes(fill = percentage),
+  geom_sf(mapping = aes(geometry = geometry, fill = percentage),
           color = "#ffffff", size = 0.25) +
   labs(fill = "% of Treatment Episodes") +
    coord_sf(datum = NA)+
@@ -298,7 +319,7 @@ freq_use_states <- freq_use_states %>%
 ```{r}
 ggplot(freq_use_states) +
   geom_sf(freq_use_states,
-          mapping = aes(fill = percentage_bin),
+          mapping = aes(geometry = geometry, fill = percentage_bin),
           color = "#ffffff", size = 0.25) +
   labs(fill = "% of Treatment Episodes",
        title = "Completed Treatment Episodes and Frequency of Use at Discharge",
@@ -379,12 +400,18 @@ services_by_state <- services_by_state %>%
 
 
 ```{r, include=FALSE}
-services_by_state$stfips <- sprintf('%02d', services_by_state$stfips)
+services_by_state$stfips_recode <- sprintf('%02d', services_by_state$stfips)
+```
+
+
+```{r}
+services_by_state %>% 
+  select(stfips, stfips_recode)
 ```
 
 
 ```{r, include=FALSE}
-colnames(services_by_state)[colnames(services_by_state) == "stfips"] <- "state_fips"
+colnames(services_by_state)[colnames(services_by_state) == "stfips_recode"] <- "state_fips"
 ```
 
 
@@ -395,15 +422,15 @@ services_by_state <- left_join(get_urbn_map(map = "states", sf = TRUE),
 ```
 
 ```{r}
-services_by_state <- services_by_state %>% 
-  drop_na()
+# services_by_state <- services_by_state %>% 
+#   drop_na()
 ```
 
 
 ```{r}
 ggplot(services_by_state) +
   geom_sf(services_by_state,
-          mapping = aes(fill = services_percentage_bin),
+          mapping = aes(geometry = geometry, fill = services_percentage_bin),
           color = "#ffffff", size = 0.25) +
   labs(fill = "% of Treatment Episodes",
        title = "Percentage of Completed Treatment Episodes in Services by State",
@@ -447,9 +474,16 @@ Median LOS by State
 Colored Boxplot by %no use
 
 ```{r}
-teds_d_select_years_relevant_completed$stfips <- sprintf('%02d',teds_d_select_years_relevant_completed$stfips)
+teds_d_select_years_relevant_completed$stfips_recode <- sprintf('%02d',teds_d_select_years_relevant_completed$stfips)
 
-colnames(teds_d_select_years_relevant_completed)[colnames(teds_d_select_years_relevant_completed) == "stfips"] <- "state_fips"
+colnames(teds_d_select_years_relevant_completed)[colnames(teds_d_select_years_relevant_completed) == "stfips_recode"] <- "state_fips"
+
+#teds_d_select_years_relevant_completed$state_fips <- as.numeric(teds_d_select_years_relevant_completed$state_fips)
+
+teds_d_select_years_relevant_completed %>% 
+  select(stfips, state_fips) %>% 
+  unique()
+
 ```
 
 
