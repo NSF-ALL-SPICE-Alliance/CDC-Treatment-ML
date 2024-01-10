@@ -599,3 +599,12 @@ ggplot(los_binned_by_state, aes(x = percent_in_los, y = state_name, fill = forca
   subtitle = "TEDS-D Completed Treatment Episodes") +
   guides(fill = guide_legend(reverse = TRUE))
 ```
+
+
+
+
+
+```{r}
+
+```
+
