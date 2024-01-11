@@ -313,3 +313,160 @@ ggplot(pdp_dsmcrit, aes(y = reorder(dsmcrit, yhat), x = yhat)) +
        y = "")
 ```
 
+
+*Employment Change Aggregate*
+
+```{r}
+pdp_employment_change_aggregate <- read_csv(here("data/pdp_employment_change_aggregate.csv"))
+```
+
+
+Plot
+
+```{r}
+ggplot(pdp_employment_change_aggregate, aes(y = reorder(employment_change_aggregate, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+*Referral Source*
+
+
+```{r}
+pdp_referral <- read_csv(here("data/pdp_referral.csv"))
+```
+
+
+Replace services codes with label
+
+```{r}
+pdp_referral$psource[pdp_referral$psource == "1"] <- "Individual"
+
+pdp_referral$psource[pdp_referral$psource == "2"] <- "Alcohol/drug use care provider"
+
+pdp_referral$psource[pdp_referral$psource == "3"] <- "Other health care provider"
+
+pdp_referral$psource[pdp_referral$psource == "4"] <- "School"
+
+pdp_referral$psource[pdp_referral$psource == "5"] <- "Employer/EAP"
+
+pdp_referral$psource[pdp_referral$psource == "6"] <- "Other community referral"
+
+pdp_referral$psource[pdp_referral$psource == "7"] <- "Court/criminal justice referral/DUI/DWI"
+
+
+```
+
+Plot
+
+```{r}
+ggplot(pdp_referral, aes(y = reorder(psource, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "")
+```
+
+*Self Help Change Aggregate*
+
+
+```{r}
+#pdp_self_hel_change_aggregate <- read_csv(here("data/pdp_employment_change_aggregate.csv"))
+```
+
+
+
+
+Combine Data for 1 faceted PDP Plot (Excluding State)
+
+
+```{r}
+df_list <- list(pdp_freq1,
+                pdp_los_binned,
+                pdp_services,
+            # pdp_stfips_names,
+                pdp_division,
+                pdp_region,
+                pdp_living_arrangement_change_aggregate,
+                pdp_self_help,
+                pdp_dsmcrit,
+                pdp_employment_change_aggregate,
+                pdp_referral)
+```
+
+
+```{r}
+pdp_joined <- Reduce(full_join, df_list)
+```
+
+```{r}
+pdp_joined_longer <- pdp_joined %>% 
+  #select(-stfips) %>% 
+  pivot_longer(cols = c("freq1",
+                        "los_binned",
+                        "services_d",
+                        "division",
+                        "region",
+                        "living_arrangement_change_aggregate",
+                        "freq_atnd_self_help_d",
+                        "dsmcrit",
+                        "employment_change_aggregate",
+                        "psource"),
+               names_to = "feature",
+               values_to = "class"
+               ) %>% 
+  drop_na()
+```
+
+
+```{r}
+ggplot(pdp_joined_longer, aes(y = reorder(class, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "") +
+  facet_wrap(~feature, scales = "free_y", ncol = 2) +
+  theme(axis.text.y = element_text(size = 4),
+        axis.text.x = element_text(size = 4),
+        strip.text = element_text(size = 4),
+        plot.title = element_text(size = 8),
+        axis.title = element_text(size = 5))
+```
+
+```{r}
+# Define the desired order of facets
+facet_order <- c("freq1",
+                        "los_binned",
+                        "services_d",
+                        "division",
+                        "region",
+                        "living_arrangement_change_aggregate",
+                        "freq_atnd_self_help_d",
+                        "dsmcrit",
+                        "employment_change_aggregate",
+                        "psource")
+
+# Use factor to set the levels in the desired order
+pdp_joined_longer$feature <- factor(pdp_joined_longer$feature, levels = facet_order)
+```
+
+
+```{r}
+ggplot(pdp_joined_longer, aes(y = reorder(class, yhat), x = yhat)) +
+  geom_bar(stat = "identity", fill = "#639CA4FF", color = "black") +
+  theme_minimal() +
+  labs(title = "Partial Dependence Plot",
+       x = "Prediction of No-Use at Discharge",
+       y = "") +
+  facet_wrap(~feature, scales = "free_y", ncol = 2) +
+  theme(axis.text.y = element_text(size = 4),
+        axis.text.x = element_text(size = 4),
+        strip.text = element_text(size = 4),
+        plot.title = element_text(size = 8),
+        axis.title = element_text(size = 5))
+```
+
