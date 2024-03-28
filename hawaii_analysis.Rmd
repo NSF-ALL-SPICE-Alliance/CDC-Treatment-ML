@@ -1,0 +1,204 @@
+---
+title: "Hawaii Sankey"
+author: "Connor Flynn"
+date: "2/5/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(feather)
+library(janitor)
+library(ggalluvial)
+library(arrow)
+```
+
+Load in Data
+
+14 million treatment episodes from 2012-2020
+
+```{r}
+teds_d <- arrow::read_feather(here("data/tedsD_2012_2020.feather"))
+```
+
+
+Clean Column Names
+
+```{r}
+teds_d <- teds_d %>% 
+  clean_names()
+```
+
+
+Select columns
+
+```{r}
+teds_d_limited <- teds_d %>% 
+  select(disyr, reason, services, services_d, freq1, freq1_d, employ, employ_d, livarag, livarag_d, freq_atnd_self_help, freq_atnd_self_help_d, stfips)
+```
+
+
+```{r}
+teds_d_limited_years <- teds_d_limited %>% 
+  filter(disyr %in% c("2015", "2016", "2017", "2018", "2019", "2020"))
+```
+
+
+
+```{r}
+teds_d_limited_years_hi <- teds_d_limited_years %>% 
+  filter(stfips == "15")
+```
+
+
+
+```{r}
+hi_services_freq_use <- teds_d_limited_years_hi %>% 
+  group_by(services_d, freq1, freq1_d) %>% 
+  count() 
+```
+
+
+```{r}
+
+
+
+# Services at Discharge 
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "1"] <- "Detox, 24-hour, hospital inpatient"
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "2"] <- "Detox, 24-hour, free-standing residential"
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "3"] <- "Rehab/residential, hospital (non-detox)"
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "4"] <- "Rehab/residential, short term (30 days or fewer)"
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "5"] <- "Rehab/residential, long term (more than 30 days)"
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "6"] <- "Ambulatory, intensive outpatient"
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "7"] <- "Ambulatory, non-intensive outpatient"
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "8"] <- "Ambulatory, detoxification"
+
+hi_services_freq_use$services_d[hi_services_freq_use$services_d == "-9"] <- "Unknown"
+
+
+
+
+
+# Frequency of Use at Discharge
+
+hi_services_freq_use$freq1_d[hi_services_freq_use$freq1_d == "1"] <- "no use"
+
+
+hi_services_freq_use$freq1_d[hi_services_freq_use$freq1_d == "2"] <- "some use"
+
+
+hi_services_freq_use$freq1_d[hi_services_freq_use$freq1_d == "3"] <- "daily use"
+
+
+hi_services_freq_use$freq1_d[hi_services_freq_use$freq1_d == "-9"] <- "Uknown"
+
+# Frequency of Use at Admission
+
+hi_services_freq_use$freq1[hi_services_freq_use$freq1 == "1"] <- "no use"
+
+
+hi_services_freq_use$freq1[hi_services_freq_use$freq1 == "2"] <- "some use"
+
+
+hi_services_freq_use$freq1[hi_services_freq_use$freq1 == "3"] <- "daily use"
+
+hi_services_freq_use$freq1[hi_services_freq_use$freq1 == "-9"] <- "Uknown"
+
+
+
+
+
+
+```
+
+
+
+
+```{r}
+hi_services_freq_use <- hi_services_freq_use %>% 
+  filter(services_d != "Ambulatory, detoxification")
+```
+
+
+
+```{r}
+ggplot(data = hi_services_freq_use,
+       aes(axis1 = freq1, axis3 = services_d,  axis4 = freq1_d,
+           y = n)) +
+  #scale_x_discrete(limits = c("Class", "Sex", "Age"), expand = c(.2, .05)) +
+  #xlab("Demographic") +
+  geom_alluvium(aes(fill = freq1_d)) +
+  scale_fill_viridis_d() +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  theme_minimal() 
+
+```
+
+
+```{r}
+# Load dataset from github
+data <- read.table("https://raw.githubusercontent.com/holtzy/data_to_viz/master/Example_dataset/13_AdjacencyDirectedWeighted.csv", header=TRUE)
+# Package
+#library(networkD3)
+
+# I need a long format
+data_long <- data %>%
+  rownames_to_column %>%
+  gather(key = 'key', value = 'value', -rowname) %>%
+  filter(value > 0)
+colnames(data_long) <- c("source", "target", "value")
+data_long$target <- paste(data_long$target, " ", sep="")
+
+# From these flows we need to create a node data frame: it lists every entities involved in the flow
+nodes <- data.frame(name=c(as.character(data_long$source), as.character(data_long$target)) %>% unique())
+ 
+# With networkD3, connection must be provided using id, not using real name like in the links dataframe.. So we need to reformat it.
+data_long$IDsource=match(data_long$source, nodes$name)-1 
+data_long$IDtarget=match(data_long$target, nodes$name)-1
+
+# prepare colour scale
+ColourScal ='d3.scaleOrdinal() .range(["#FDE725FF","#B4DE2CFF","#6DCD59FF","#35B779FF","#1F9E89FF","#26828EFF","#31688EFF","#3E4A89FF","#482878FF","#440154FF"])'
+
+# Make the Network
+sankeyNetwork(Links = data_long, Nodes = nodes,
+                     Source = "IDsource", Target = "IDtarget",
+                     Value = "value", NodeID = "name", 
+                     sinksRight=FALSE, colourScale=ColourScal, nodeWidth=40, fontSize=13, nodePadding=20)
+```
+
+
+
+```{r}
+titanic_wide <- data.frame(Titanic)
+head(titanic_wide)
+#>   Class    Sex   Age Survived Freq
+#> 1   1st   Male Child       No    0
+#> 2   2nd   Male Child       No    0
+#> 3   3rd   Male Child       No   35
+#> 4  Crew   Male Child       No    0
+#> 5   1st Female Child       No    0
+#> 6   2nd Female Child       No    0
+ggplot(data = titanic_wide,
+       aes(axis1 = Class, axis2 = Sex, axis3 = Age,
+           y = Freq)) +
+  scale_x_discrete(limits = c("Class", "Sex", "Age"), expand = c(.2, .05)) +
+  xlab("Demographic") +
+  geom_alluvium(aes(fill = Survived)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  theme_minimal() +
+  ggtitle("passengers on the maiden voyage of the Titanic",
+          "stratified by demographics and survival")
+```
+
