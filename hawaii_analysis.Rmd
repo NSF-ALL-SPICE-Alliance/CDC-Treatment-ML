@@ -134,6 +134,12 @@ hi_services_freq_use <- hi_services_freq_use %>%
   filter(services_d != "Ambulatory, detoxification")
 ```
 
+```{r}
+hi_services_freq_use_percent <- hi_services_freq_use %>% 
+  group_by(services_d) %>%
+  mutate(total_n = sum(n)) %>%
+  mutate(Percentage = (n / total_n) * 100) 
+```
 
 
 ```{r}
