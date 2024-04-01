@@ -61,6 +61,11 @@ hi_services_freq_use <- teds_d_limited_years_hi %>%
 ```
 
 
+
+hi_services_freq_use <- teds_d_limited_years_hi %>% 
+  group_by(services_d, employ, employ_d) %>% 
+  count() 
+
 ```{r}
 
 
