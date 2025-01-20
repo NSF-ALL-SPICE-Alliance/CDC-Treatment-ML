@@ -14,7 +14,7 @@ library(janitor)
 library(haven)
 library(feather)
 library(arrow)
-library(chorddiag)
+#library(chorddiag)
 library(circlize)
 library(kableExtra)
 options(scipen = 99)
@@ -24,40 +24,14 @@ options(scipen = 99)
 Load in Data
 
 ```{r}
-teds_d <- arrow::read_feather(here("data/tedsD_2012_2020.feather"))
-```
-
-
-Clean Column Names
-
-```{r}
-teds_d <- teds_d %>% 
-  clean_names()
-```
-
-
-Filter for years with admission/discharge data
-
-
-```{r}
-teds_d_select_years <- teds_d %>% 
-  filter(disyr %in% c("2015", "2016", "2017", "2018", "2019", "2020"))
-```
-
-
-
-
-Replace -9 with NA
-
-```{r}
-teds_d_select_years[teds_d_select_years == "-9"] <- NA
+teds_d <- arrow::read_feather(here("data/teds_d_15_19.feather"))
 ```
 
 
 Relevant variables
 
 ```{r}
-teds_d_select_years_relevant <- teds_d_select_years %>% 
+teds_d_select_years_relevant <- teds_d %>% 
   select(reason, freq1, freq1_d, los, employ, employ_d, livarag, livarag_d, freq_atnd_self_help, freq_atnd_self_help_d, stfips)
 ```
 
@@ -68,58 +42,24 @@ table(teds_d_select_years_relevant$reason)
 ```
 
 ```{r}
-
-reasons <- data.frame(
-  reason = c(1, 2, 3, 4, 5, 6, 7),
-  n = c(3944737, 2394492, 567046, 1837375, 159402, 22064, 394714)
-)
-
-reasons <- reasons %>%
-  mutate(percentage = n/sum(n) * 100) 
-
-print(reasons)
-
-```
-```{r}
-teds_d_select_years_relevant_arizona <- teds_d_select_years_relevant %>% 
-  filter(stfips == 4)
-```
-
-```{r}
-table(teds_d_select_years_relevant_arizona$reason)
-```
-
-```{r}
-state_reasons <- teds_d_select_years_relevant %>%
-  group_by(stfips) %>% 
-  count(reason) %>%
-  mutate(percentage = (n / sum(n)) * 100)
+teds_d_select_years_relevant %>%
+  group_by(reason) %>% 
+  summarise(count = n()) %>% 
+  mutate(percentage = count / sum(count) * 100)
 ```
 
 
-```{r}
-reasons <- c("1", "2")
 
+
+```{r}
+reasons <- c(1, 2) # Define reasons as numeric
 teds_d_select_years_relevant_1_2 <- teds_d_select_years_relevant %>% 
   filter(reason %in% reasons)
 ```
 
 
-
-
-
-
-
-
-
 ```{r}
-teds_d_select_years_relevant_1_2$reason <- as.factor(teds_d_select_years_relevant_1_2$reason)
-
-ggplot(teds_d_select_years_relevant_1_2, aes(x = freq1_d, fill = reason)) +
-  geom_bar(stat = "count", position = "dodge") +
-  scale_fill_brewer(palette = "Set3") +
-  theme_minimal() +
-  coord_flip()
+table(teds_d_select_years_relevant_1_2$reason)
 ```
 
 
@@ -138,7 +78,7 @@ Completed Treatment
 
 ```{r}
 teds_d_select_years_relevant_1 <- teds_d_select_years_relevant_1_2 %>% 
-  filter(reason == "1")
+  filter(reason == 1)
 ```
 
 ```{r}
@@ -148,6 +88,7 @@ teds_d_select_years_relevant_1 <- teds_d_select_years_relevant_1 %>%
 teds_d_select_years_relevant_1 <- teds_d_select_years_relevant_1 %>%
   mutate_at(vars(freq1, freq1_d), as.character)
 ```
+
 
 
 ```{r}
@@ -194,9 +135,16 @@ matrix_data_completed <- as.matrix(matrix_data_completed)
 
 
 ```{r}
+# Set the output file path
+output_file <- here("plots", "frequency_of_use_chord_completed.png")
 
+# Save the plot as a PNG with higher resolution and larger dimensions
+png(output_file, width = 3600, height = 3600, res = 450) # Adjust dimensions and resolution
+
+
+# Generate the plot
 circos.clear()
-circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.12), points.overflow.warning = FALSE)
 par(mar = rep(0, 4))
 
 cols <- hcl.colors(16, "Geyser")
@@ -210,10 +158,13 @@ completed_chord <- chordDiagram(matrix_data_completed,
              link.lty = 1,    # Line type
              link.border = 1,
              directional = 1, direction.type = c("diffHeight", "arrows"),
-    link.arr.type = "big.arrow",
+             link.arr.type = "big.arrow",
              grid.col = colors) 
 title("Frequency of Use from Admission to Discharge", line = -1, sub = "Completed Treatments")
-#completed_chord
+
+# Close the device to save the plot
+dev.off()
+
 ```
 
 
@@ -248,21 +199,11 @@ completed_chord %>%
 
 ```
 
-
-```{r}
-completed_chord %>% 
-  group_by(cn) %>%
-  summarize(episodes = sum(value1)) %>% 
-  mutate(percentage = (episodes / sum(episodes)) * 100)
-  
-```
-
-
 Dropped out of Treatment 
 
 ```{r}
 teds_d_select_years_relevant_2 <- teds_d_select_years_relevant_1_2 %>% 
-  filter(reason == "2")
+  filter(reason == 2)
 ```
 
 ```{r}
@@ -319,8 +260,15 @@ matrix_data_dropped <- as.matrix(matrix_data_dropped)
 
 ```{r}
 
+# Set the output file path
+output_file <- here("plots", "frequency_of_use_chord_dropped.png")
+
+# Save the plot as a PNG with higher resolution and larger dimensions
+png(output_file, width = 3600, height = 3600, res = 450) # Adjust dimensions and resolution
+
+
 circos.clear()
-circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.12), points.overflow.warning = FALSE)
 par(mar = rep(0, 4))
 
 cols <- hcl.colors(16, "Geyser")
@@ -338,7 +286,8 @@ dropped_chord <- chordDiagram(matrix_data_dropped,
              grid.col = colors) 
 title("Frequency of Use from Admission to Discharge", line = -1, sub = "Dropped Out Treatments")
 
-#dropped_chord
+# Close the device to save the plot
+dev.off()
 
 
 
@@ -392,7 +341,7 @@ Completed
 
 ```{r}
 teds_d_select_years_relevant_1 <- teds_d_select_years_relevant_1_2 %>% 
-  filter(reason == "1")
+  filter(reason == 1)
 ```
 
 ```{r}
@@ -459,9 +408,15 @@ matrix_data_employment <- as.matrix(matrix_data_employment)
 
 
 ```{r}
+# Set the output file path
+output_file <- here("plots", "employment_chord_completed.png")
+
+# Save the plot as a PNG with higher resolution and larger dimensions
+png(output_file, width = 3600, height = 3600, res = 450) # Adjust dimensions and resolution
+
 
 circos.clear()
-circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.12), points.overflow.warning = FALSE)
 par(mar = rep(0, 4))
 
 cols <- hcl.colors(25, "Geyser")
@@ -480,7 +435,7 @@ completed_chord_employment <- chordDiagram(matrix_data_employment,
              grid.col = colors) 
 title("Employment from Admission to Discharge", line = -1, sub = "Completed Treatments")
 
-
+dev.off()
 
 ```
 ```{r}
@@ -520,7 +475,7 @@ Dropped
 
 ```{r}
 teds_d_select_years_relevant_2 <- teds_d_select_years_relevant_1_2 %>% 
-  filter(reason == "2")
+  filter(reason == 2)
 ```
 
 ```{r}
@@ -587,9 +542,15 @@ matrix_data_employment_dropped <- as.matrix(matrix_data_employment_dropped)
 
 
 ```{r}
+# Set the output file path
+output_file <- here("plots", "employment_chord_dropped.png")
+
+# Save the plot as a PNG with higher resolution and larger dimensions
+png(output_file, width = 3600, height = 3600, res = 450) # Adjust dimensions and resolution
+
 
 circos.clear()
-circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.12), points.overflow.warning = FALSE)
 par(mar = rep(0, 4))
 
 cols <- hcl.colors(25, "Geyser")
@@ -607,7 +568,7 @@ dropped_chord_employment <- chordDiagram(matrix_data_employment_dropped,
              grid.col = colors) 
 title("Employment from Admission to Discharge", line = -1, sub = "Dropped Treatments")
 
-
+dev.off()
 
 ```
 
@@ -615,8 +576,16 @@ title("Employment from Admission to Discharge", line = -1, sub = "Dropped Treatm
 dropped_chord_employment <- dropped_chord_employment %>% 
   select(rn, cn, col, value1) %>% 
   mutate(percentage = value1/sum(value1) *100)
+
+colnames(dropped_chord_employment)[colnames(dropped_chord_employment) == "rn"] ="Admission"
+
+colnames(dropped_chord_employment)[colnames(dropped_chord_employment) == "cn"] ="Discharge"
+
+colnames(dropped_chord_employment)[colnames(dropped_chord_employment) == "value1"] ="Treatment Episodes"
+
+colnames(dropped_chord_employment)[colnames(dropped_chord_employment) == "percentage"] ="Percentage"
 # 
-dropped_chord_employment <- dropped_chord_employment[order(-dropped_chord_employment$percentage), ]
+dropped_chord_employment <- dropped_chord_employment[order(-dropped_chord_employment$Percentage), ]
 ```
 
 
@@ -625,7 +594,9 @@ dropped_chord_employment <- dropped_chord_employment[order(-dropped_chord_employ
 dropped_chord_employment %>%
   kbl(caption = "Pathways in Employment for Dropped Out Treatments") %>%
   kable_classic(full_width = F, html_font = "Cambria") %>% 
-  column_spec(1:6, background = dropped_chord$col) 
+  column_spec(1:6, background = dropped_chord$col) %>% 
+  kableExtra::remove_column(1) %>%
+  kableExtra::remove_column(3)
 
 ```
 
@@ -637,7 +608,7 @@ Completed
 
 ```{r}
 teds_d_select_years_relevant_1 <- teds_d_select_years_relevant_1_2 %>% 
-  filter(reason == "1")
+  filter(reason == 1)
 ```
 
 ```{r}
@@ -706,9 +677,14 @@ matrix_data_housing <- as.matrix(matrix_data_housing)
 
 
 ```{r}
+# Set the output file path
+output_file <- here("plots", "living_arrangement_completed_chord.png")
+
+# Save the plot as a PNG with higher resolution and larger dimensions
+png(output_file, width = 3600, height = 3600, res = 450) # Adjust dimensions and resolution
 
 circos.clear()
-circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.12), points.overflow.warning = FALSE)
 par(mar = rep(0, 4))
 
 cols <- hcl.colors(16, "Geyser")
@@ -727,7 +703,7 @@ completed_chord_housing <- chordDiagram(matrix_data_housing,
 
 title("Living Arrangement from Admission to Discharge", line = -1, sub = "Completed Treatments")
 
-
+dev.off()
 
 
 ```
@@ -736,8 +712,18 @@ title("Living Arrangement from Admission to Discharge", line = -1, sub = "Comple
 completed_chord_housing <- completed_chord_housing %>% 
   select(rn, cn, col, value1) %>% 
   mutate(percentage = value1/sum(value1) *100)
+
+colnames(completed_chord_housing)[colnames(completed_chord_housing) == "rn"] ="Admission"
+
+colnames(completed_chord_housing)[colnames(completed_chord_housing) == "cn"] ="Discharge"
+
+colnames(completed_chord_housing)[colnames(completed_chord_housing) == "value1"] ="Treatment Episodes"
+
+colnames(completed_chord_housing)[colnames(completed_chord_housing) == "percentage"] ="Percentage"
 # 
-completed_chord_housing <- completed_chord_housing[order(-completed_chord_housing$percentage), ]
+completed_chord_housing <- completed_chord_housing[order(-completed_chord_housing$Percentage), ]
+
+completed_chord_housing$Percentage <- round(completed_chord_housing$Percentage, digit = 2)
 ```
 
 
@@ -746,14 +732,16 @@ completed_chord_housing <- completed_chord_housing[order(-completed_chord_housin
 completed_chord_housing %>%
   kbl(caption = "Pathways in Housing for Completed Treatments") %>%
   kable_classic(full_width = F, html_font = "Cambria") %>% 
-  column_spec(1:6, background = dropped_chord$col) 
+  column_spec(1:6, background = dropped_chord$col) %>% 
+  kableExtra::remove_column(1) %>%
+  kableExtra::remove_column(3)
 ```
 
 Dropped Out
 
 ```{r}
 teds_d_select_years_relevant_2 <- teds_d_select_years_relevant_1_2 %>% 
-  filter(reason == "2")
+  filter(reason == 2)
 ```
 
 ```{r}
@@ -822,9 +810,14 @@ matrix_data_housing_dropped <- as.matrix(matrix_data_housing_dropped)
 
 
 ```{r}
+# Set the output file path
+output_file <- here("plots", "living_arrangement_chord_dropped.png")
+
+# Save the plot as a PNG with higher resolution and larger dimensions
+png(output_file, width = 3600, height = 3600, res = 450) # Adjust dimensions and resolution
 
 circos.clear()
-circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
+circos.par(start.degree = 90, gap.degree = 4, track.margin = c(-0.1, 0.12), points.overflow.warning = FALSE)
 par(mar = rep(0, 4))
 
 cols <- hcl.colors(16, "Geyser")
@@ -844,7 +837,7 @@ dropped_chord_housing <- chordDiagram(matrix_data_housing_dropped,
 title("Living Arrangement from Admission to Discharge", line = -1, sub = "Dropped Treatments")
 
 
-
+dev.off()
 
 ```
 
@@ -852,8 +845,20 @@ title("Living Arrangement from Admission to Discharge", line = -1, sub = "Droppe
 dropped_chord_housing <- dropped_chord_housing %>% 
   select(rn, cn, col, value1) %>% 
   mutate(percentage = value1/sum(value1) *100)
+
+colnames(dropped_chord_housing)[colnames(dropped_chord_housing) == "rn"] ="Admission"
+
+colnames(dropped_chord_housing)[colnames(dropped_chord_housing) == "cn"] ="Discharge"
+
+colnames(dropped_chord_housing)[colnames(dropped_chord_housing) == "value1"] ="Treatment Episodes"
+
+colnames(dropped_chord_housing)[colnames(dropped_chord_housing) == "percentage"] ="Percentage"
 # 
-dropped_chord_housing <- dropped_chord_housing[order(-dropped_chord_housing$percentage), ]
+dropped_chord_housing <- dropped_chord_housing[order(-dropped_chord_housing$Percentage), ]
+
+dropped_chord_housing$Percentage <- round(dropped_chord_housing$Percentage, digit = 2)
+# 
+dropped_chord_housing <- dropped_chord_housing[order(-dropped_chord_housing$Percentage), ]
 ```
 
 
@@ -862,7 +867,9 @@ dropped_chord_housing <- dropped_chord_housing[order(-dropped_chord_housing$perc
 dropped_chord_housing %>%
   kbl(caption = "Pathways in Housing for Dropped Out Treatments") %>%
   kable_classic(full_width = F, html_font = "Cambria") %>% 
-  column_spec(1:6, background = dropped_chord$col) 
+  column_spec(1:6, background = dropped_chord$col) %>% 
+  kableExtra::remove_column(1) %>%
+  kableExtra::remove_column(3)
 
 
 ```
